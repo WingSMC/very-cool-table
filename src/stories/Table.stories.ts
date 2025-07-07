@@ -4,8 +4,11 @@ import type {
 } from '@storybook/vue3-vite';
 import Table from '../components/Table.vue';
 
+type Data = Record<string, string>;
+
 const meta = {
 	title: 'Table',
+	// @ts-ignore
 	component: Table,
 	tags: ['autodocs'],
 	argTypes: {},
@@ -14,28 +17,43 @@ const meta = {
 		// import { fn } from 'storybook/test';
 		// onClick: fn(),
 	},
-} satisfies Meta<typeof Table>;
+} satisfies Meta<typeof Table<Data>>;
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+const mockData = (() => {
+	const modelValue = {
+		Key: ['Row 1', 'Row 2', 'Row 3'],
+		Asd: [1, 2, 3],
+		Zxc: [3, 5, 2],
+	};
+	const columns = Object.keys(modelValue);
+	const columnColors = {
+		Asd: 'red',
+		Zxc: 'cornflowerblue',
+	};
+	const readonlyColumns = ['ASD'];
+
+	return {
+		modelValue,
+		columns,
+		columnColors,
+		readonlyColumns,
+		defaultValues: {
+			Asd: 0,
+			Zxc: 0.5,
+		},
+	};
+})();
 
 export const Base: Story = {
 	args: {
 		allowAddCols: false,
 		allowAddRows: false,
-	},
-};
-
-export const AddColumns: Story = {
-	args: {
-		allowAddCols: true,
-		allowAddRows: false,
-	},
-};
-
-export const AddRows: Story = {
-	args: {
-		allowAddCols: false,
-		allowAddRows: true,
+		// @ts-ignore
+		keyColumn: 'Key',
+		defaultColumnColor: '#88AACD',
+		...mockData,
 	},
 };

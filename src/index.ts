@@ -1,3 +1,12 @@
-import Table from './components/Table.vue';
+export * from './components';
 
-export { Table };
+import type { App } from 'vue';
+import * as components from './components';
+export default {
+	install(app: App) {
+		const cs = Object.values(components);
+		for (const c of cs) {
+			app.component(c.name, c);
+		}
+	},
+};
