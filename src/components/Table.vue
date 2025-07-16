@@ -1,119 +1,320 @@
 <script setup lang="ts" generic="T extends {}">
-type Column = Exclude<keyof T, symbol>;
-type ColumnMap<V> = Record<Column, V>;
-type PartialColumnMap<V> = Partial<ColumnMap<V>>;
+import {
+	computed,
+	provide,
+	ref,
+	useTemplateRef,
+} from 'vue';
+import type { InputProps } from '../types';
+import {
+	ColumnTypeEnum,
+	SELECTION_SERVICE,
+	useTableOps,
+	useTableSelection,
+	type ColumnKey,
+	type SomeColumn,
+} from '../util';
+import { useTableEvents } from '../util/functions/table-event-bindings';
+import StringCell from './StringCell.vue';
 
-const data = defineModel<T>({ required: true });
-const {
-	allowAddCols = false,
-	allowAddRows = false,
-	editable = true,
+const table = defineModel<T>({ required: true });
+const columns = defineModel<ColumnKey<T>[]>(
+	'columns',
+	{ required: true },
+);
 
+const props = withDefaults(
+	defineProps<InputProps<T>>(),
+	{
+		allowAddCols: true,
+		allowAddRows: true,
+		editable: true,
+		defaultColumnColor: '#000000',
+		readonlyColumns: () => [],
+		columnColors: () => ({}),
+		defaultValues: () => ({}),
+		columnTypes: () => ({}),
+		columnPrecisions: () => ({}),
+		extraHeaderMenuItems: () => [],
+		overrideTypeToCellComponentTypeMap:
+			() => ({}),
+	},
+);
+
+const typeToComponentMap = computed<
+	Record<number, any>
+>(() => ({
+	[ColumnTypeEnum.Number]: StringCell,
+	[ColumnTypeEnum.String]: StringCell,
+	[ColumnTypeEnum.Boolean]: StringCell,
+	...props.overrideTypeToCellComponentTypeMap,
+}));
+
+const sel = useTableSelection(
 	columns,
-	keyColumn,
-	readonlyColumns = [],
-	defaultValues = {} as PartialColumnMap<
-		T[Column]
-	>,
-	columnColors = {} as PartialColumnMap<string>,
-	defaultColumnColor = '#777777',
-} = defineProps<{
-	allowAddRows: boolean;
-	allowAddCols: boolean;
-	editable: boolean;
+	props,
+	computed(() => {
+		return table.value[
+			props.keyColumn
+		] as SomeColumn;
+	}),
+);
+const ops = useTableOps(
+	table,
+	columns,
+	props,
+	sel,
+);
+useTableEvents(
+	props,
+	sel,
+	ops,
+	useTemplateRef('tableContainer'),
+);
 
-	columns: Column[];
-	keyColumn?: Column;
-	readonlyColumns?: Column[];
-	defaultValues?: PartialColumnMap<T[Column]>;
-	columnColors?: PartialColumnMap<string>;
-	defaultColumnColor: string;
-	// columnTypes: Record<Column, Type<Component fitting interface>>
-}>();
+provide(SELECTION_SERVICE, sel);
 
-function selectColumn(_i: number) {}
-function isColumnSelected(_i: number) {
-	return true;
-}
-function isRowSelected(
-	_col: string | number,
-	_row: number,
+const menu = ref();
+const ctxMenuCol = ref<
+	| {
+			name: string;
+			index: number;
+	  }
+	| undefined
+>(undefined);
+
+const editableMenuItems = computed(() =>
+	props.editable
+		? [
+				{
+					label: 'Move Right',
+					icon: 'pi pi-arrow-right',
+					kbd: ['Alt', '→'],
+					command: () => {
+						sel.selectColumn(
+							ctxMenuCol.value!.index,
+						);
+						ops.moveSelCol(1);
+					},
+				},
+				{
+					label: 'Move Left',
+					icon: 'pi pi-arrow-left',
+					kbd: ['Alt', '←'],
+					command: () => {
+						sel.selectColumn(
+							ctxMenuCol.value!.index,
+						);
+						ops.moveSelCol(-1);
+					},
+				},
+		  ]
+		: [],
+);
+
+const menuItems = computed(() => {
+	return [
+		...props.extraHeaderMenuItems,
+		...editableMenuItems.value,
+	];
+});
+
+function showHeaderCtxMenu(
+	event: MouseEvent,
+	colName: string,
+	colIndex: number,
 ) {
-	return _row > 0;
+	if (menuItems.value.length === 0) return;
+
+	ctxMenuCol.value = {
+		name: colName,
+		index: colIndex,
+	};
+	menu.value.show(event);
 }
 </script>
 
 <template>
-	<div
-		class="grid grid-rows-[var(--table-header-height)_1fr] shadow-lg rounded-lg relative z-1"
-	>
-		<!-- 		<slot name="context-menu">HI</slot> -->
-		<div class="bclg-table-header">
-			<div
-				class="bclg-table-header-cell bclg-table-cell flex gap-4 flex-row-reverse justify-between items-center"
-				v-for="(col, i) in columns"
-				:key="col"
-				:class="{ even: i % 2 === 0 }"
-				:style="{
-					'--color-cell-inherit':
-						columnColors[col] ??
-						defaultColumnColor,
-				}"
-				@click="selectColumn(i)"
-			>
-				<span class="header-title select-none">{{
-					col
-				}}</span>
-				<!-- 				@if ($headerTemplate(); as headerTemplate)
-				{
-				<ng-container
-					[ngTemplateOutlet]="headerTemplate"
-					[ngTemplateOutletContext]="{ $implicit: colName, column }"
-				></ng-container>
-				} -->
-			</div>
-		</div>
+	<div>
+		<div
+			class="shadow-lg rounded-lg relative z-1"
+			ref="tableContainer"
+		>
+			<div class="bclg-table-header">
+				<!-- prettier-ignore -->
+				<ContextMenu
+					ref="menu"
+					class="
+					[&_.p-contextmenu-root-list]:!grid
+					[&_.p-contextmenu-root-list]:grid-cols-[min-content_min-content_min-content]
+					[&_.p-contextmenu-item]:col-span-3
+					[&_.p-contextmenu-item]:!grid
+					[&_.p-contextmenu-item]:grid-cols-subgrid
+					[&_.p-contextmenu-item-content]:col-span-3
+					[&_.p-contextmenu-item-content]:grid
+					[&_.p-contextmenu-item-content]:grid-cols-subgrid
+					"
+					:model="menuItems"
+					@hide="ctxMenuCol = undefined"
+				>
+					<template #item="{ item, props }">
+						<div
+							class="col-span-3 !grid grid-cols-subgrid !gap-4  items-center"
+							v-bind="props.action"
+						>
+							<span :class="item.icon" />
+							<span class="whitespace-nowrap">{{
+								item.label
+							}}</span>
+							<span
+								v-if="item.kbd"
+								class="flex items-center gap-1"
+							>
+								<kbd
+									v-for="key in item.kbd"
+									class="inline-block px-1.5 py-0.5 text-xs font-mono border rounded"
+									:key="key"
+									>{{ key }}</kbd
+								>
+							</span>
+						</div>
+					</template>
+				</ContextMenu>
 
-		<div class="bclg-table-body overflow-hidden">
+				<div
+					v-for="(col, i) in columns"
+					class="bclg-table-header-cell bclg-table-cell flex gap-4 flex-row-reverse justify-between items-center"
+					aria-haspopup="true"
+					:key="col"
+					:class="{ even: i % 2 === 0 }"
+					:style="{
+						'--color-vct-cell-inherit':
+							columnColors[col] ??
+							defaultColumnColor,
+					}"
+					@click="sel.selectColumn(i)"
+					@contextmenu="
+						showHeaderCtxMenu($event, col, i)
+					"
+				>
+					<span
+						class="header-title select-none after:rotate-90"
+						>{{ col }}</span
+					>
+				</div>
+			</div>
+
 			<div
-				class="bclg-table-column relative"
-				v-for="(col, i) in columns"
-				:key="col"
-				:class="{
-					selected: isColumnSelected(i),
-					even: i % 2 === 0,
-				}"
-				:style="{
-					'--color-cell-inherit':
-						columnColors[col] ??
-						defaultColumnColor,
-				}"
+				class="bclg-table-body overflow-hidden"
 			>
 				<div
-					v-for="(v, row) in data[col]"
-					class="bclg-table-cell"
-					:key="row"
+					class="bclg-table-column relative"
+					v-for="(colName, col) in columns"
+					:key="colName"
 					:class="{
-				even: (row as number) % 2 === 0,
-				selected: isRowSelected(col, row as number),
-			}"
+						selected: sel.isColumnSelected(col),
+						even: col % 2 === 0,
+						'cursor-not-allowed':
+							readonlyColumns.includes(colName),
+					}"
+					:style="{
+						'--color-vct-cell-inherit':
+							columnColors[colName] ??
+							defaultColumnColor,
+					}"
 				>
-					{{ v }}
+					<Component
+						v-for="(_, row) in table[colName] as SomeColumn"
+						class="bclg-table-cell select-none"
+						:is="
+							typeToComponentMap[
+								props.columnTypes[colName] ??
+									ColumnTypeEnum.String
+							]
+						"
+						:class="{
+							even: row % 2 === 0,
+							selected: sel.isRowSelected(row),
+						}"
+						:key="row"
+						:editing="sel.isEditedCell(col, row)"
+						:readonly="
+							readonlyColumns.includes(colName) ||
+							!editable
+						"
+						v-model.lazy="(table[colName] as SomeColumn)[row]"
+						@mousedown="
+							sel.onSelectionStart(
+								col,
+								row,
+								$event,
+							)
+						"
+						@mousemove="
+							sel.onSelectionMove(
+								col,
+								row,
+								$event,
+							)
+						"
+						@mouseup="
+							sel.onSelectionEnd(col, row)
+						"
+						@dblclick="
+							editable &&
+								sel.setEditedCell({ col, row })
+						"
+					/>
 				</div>
 			</div>
 		</div>
+
+		<div
+			v-if="editable"
+			class="relative -top-1 z-0"
+		>
+			<button
+				v-if="allowAddRows"
+				class="absolute rounded-b-md h-9 w-20 px-4 py-1.5 text-white font-extrabold hover:bg-blue-600 cursor-pointer bg-blue-500"
+				type="button"
+				@click="ops.pushRow"
+				>+Row</button
+			>
+
+			<button
+				v-if="allowAddCols"
+				class="absolute rounded-b-md h-9 w-20 px-4 py-1.5 text-white font-extrabold hover:bg-blue-600 cursor-pointer bg-blue-500 left-24"
+				type="button"
+				@click="ops.pushColumn"
+				>+Col</button
+			>
+		</div>
 	</div>
-	{{ data }}
-	{{ allowAddCols }}
-	{{ allowAddRows }}
-	{{ editable }}
-	{{ keyColumn }}
-	{{ readonlyColumns }}
-	{{ defaultValues }}
 </template>
+
+<style>
+:root {
+	--color-vct-cell-inherit: black;
+	--spacing-vct-cell-height: 40px;
+	--text-shadow-vct: 0 0 2rem
+		var(--color-vct-cell-inherit);
+	--inset-shadow-vct: inset 0px 0px 3rem 0rem
+		var(--tw-inset-shadow-color);
+}
+</style>
 
 <style scoped>
 @reference '../../.storybook/style.css';
+
+@theme {
+	--color-vct-cell-inherit: black;
+	--spacing-vct-cell-height: 40px;
+	--text-shadow-vct: 0 0 2rem
+		var(--color-vct-cell-inherit);
+
+	--inset-shadow-vct: inset 0px 0px 3rem 0rem
+		var(--tw-inset-shadow-color);
+}
 
 .bclg-table-header,
 .bclg-table-body {
@@ -140,14 +341,14 @@ function isRowSelected(
 }
 
 .bclg-table-cell {
-	@apply h-cell-height
-		leading-cell-height
+	@apply h-vct-cell-height
+		leading-vct-cell-height
 		text-center
 		border
 		border-transparent
 		bg-clip-border
 
-		text-cell-inherit
+		text-vct-cell-inherit
 
 		bg-white
 		[.even,.even>*]:bg-gray-50
@@ -158,11 +359,8 @@ function isRowSelected(
 		[.selected:has(+.selected)>.selected]:border-r-transparent
 		[.selected+.selected]:!border-t-transparent
 		has-[+.selected]:!border-b-transparent
-		
-		[.selected>.selected]:inset-shadow-select
-		[.selected>.selected]:inset-shadow-blue-50/50
-		[.even.selected>.selected,.selected>.even.selected]:inset-shadow-blue-100/90
-		[.even.selected>.even.selected]:inset-shadow-blue-200/90;
+		[.selected>.selected]:inset-shadow-vct
+		[.selected>.selected]:inset-shadow-blue-300/20;
 
 	.exclamation {
 		@apply text-orange-500 bg-orange-500/10 [.even]:bg-orange-500/20;
@@ -190,70 +388,25 @@ function isRowSelected(
 		leading-normal
 		[writing-mode:vertical-lr]
 		border-b-4
-		border-b-cell-inherit
-		text-shadow-2xl
-		text-shadow-cell-inherit
+		border-b-vct-cell-inherit
+		text-shadow-vct
 		[&.highlight>.header-title]:before:content-['@']
 		first:rounded-tl-lg
 		last:rounded-tr-lg;
 }
 
 .table-cell-input {
-	width: 100% !important;
-	text-align: center !important;
-
-	.mdc-text-field__input {
-		text-align: center !important;
-		line-height: var(
-			--spacing-cell-height
-		) !important;
-	}
-	.mdc-text-field {
-		padding: 0 !important;
-		background-color: transparent !important;
-
-		.mat-mdc-form-field-infix {
-			padding: 0 !important;
-			width: 100% !important;
-			height: var(
-				--spacing-cell-height
-			) !important;
-			min-height: var(
-				--spacing-cell-height
-			) !important;
-		}
-	}
+	width: 100%;
+	text-align: center;
 
 	input {
-		appearance: textfield !important;
-		color: inherit !important;
+		appearance: textfield;
+		color: inherit;
 
 		&::-webkit-outer-spin-button,
 		&::-webkit-inner-spin-button {
-			-webkit-appearance: none !important;
-			margin: 0 !important;
-		}
-	}
-
-	.mat-mdc-select {
-		.mat-mdc-select-trigger {
-			display: block !important;
-			position: static !important;
-
-			.mat-mdc-select-value {
-				line-height: var(
-					--spacing-cell-height
-				) !important;
-			}
-
-			.mat-mdc-select-arrow-wrapper {
-				display: block !important;
-				position: absolute !important;
-				right: 0.25em !important;
-				top: 50% !important;
-				transform: translateY(-50%) !important;
-				height: auto !important;
-			}
+			-webkit-appearance: none;
+			margin: 0;
 		}
 	}
 }

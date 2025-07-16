@@ -55,7 +55,7 @@ export default defineConfig({
 			entry: resolve(__dirname, 'src/index.ts'),
 			name: 'VeryCoolTable',
 			fileName: 'very-cool-table',
-			formats: ['es', 'umd'],
+			formats: ['es'],
 		},
 		rollupOptions: {
 			external: ['vue'],

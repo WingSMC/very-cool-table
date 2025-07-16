@@ -1,8 +1,12 @@
-# Just a nice table with copy-paste functionality
+# Just a nice table with excel-like copy/paste functionality
+
+```sh
+npm i ... primevue lodash tailwind
+```
 
 ```ts
 import {} from '@...';
 import '@.../dist/style.css';
 ```
 
-Make sure you have primevue and tailwind installed.
+PRs and requests are welcome!

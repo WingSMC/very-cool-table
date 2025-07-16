@@ -1,8 +1,16 @@
 {
 	"name": "very-cool-table",
-	"private": true,
+	"private": false,
 	"version": "0.0.0",
 	"type": "module",
+	"author": {
+		"name": "Gergely Dremák (WingSMC)",
+		"url": "https://github.com/WingSMC"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/WingSMC/very-cool-table.git"
+	},
 	"scripts": {
 		"dev": "vite",
 		"build": "vue-tsc -b && vite build",
@@ -10,16 +18,14 @@
 		"storybook": "storybook dev -p 6006",
 		"build-storybook": "storybook build"
 	},
-	"dependencies": {
-		"vue": "^3.5.17"
-	},
 	"devDependencies": {
-		"@chromatic-com/storybook": "^4.0.1",
+		"@primeuix/themes": "^1.2.1",
 		"@storybook/addon-a11y": "^9.0.15",
 		"@storybook/addon-docs": "^9.0.15",
 		"@storybook/addon-vitest": "^9.0.15",
 		"@storybook/vue3-vite": "^9.0.15",
 		"@tailwindcss/vite": "^4.1.11",
+		"@types/lodash": "^4.17.20",
 		"@types/node": "^24.0.10",
 		"@vitejs/plugin-vue": "^6.0.0",
 		"@vitest/browser": "^3.2.4",
@@ -31,6 +37,23 @@
 		"typescript": "~5.8.3",
 		"vite": "^7.0.0",
 		"vitest": "^3.2.4",
-		"vue-tsc": "^3.0.1"
+		"vue-tsc": "^3.0.1",
+		"@vueuse/core": "^13.5.0",
+		"vue": "^3.5.17",
+		"primeicons": "^7.0.0",
+		"primevue": "^4.3.6",
+		"lodash": "^4.17.21"
+	},
+	"peerDependencies": {
+		"@vueuse/core": "13.x",
+		"vue": ">= 3.5 < 4",
+		"primevue": "4.x",
+		"primeicons": "7.x",
+		"lodash": "4.x"
+	},
+	"peerDependenciesMeta": {
+		"primeicons": {
+			"optional": true
+		}
 	}
 }

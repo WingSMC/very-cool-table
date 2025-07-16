@@ -1,4 +1,4 @@
-import type { StorybookConfig } from '@storybook/vue3-vite';
+import { StorybookConfig } from '@storybook/vue3-vite';
 
 const config: StorybookConfig = {
 	stories: [
@@ -6,7 +6,6 @@ const config: StorybookConfig = {
 		'../src/**/*.stories.@(ts)',
 	],
 	addons: [
-		'@chromatic-com/storybook',
 		'@storybook/addon-docs',
 		'@storybook/addon-a11y',
 		'@storybook/addon-vitest',
@@ -16,5 +15,4 @@ const config: StorybookConfig = {
 		options: {},
 	},
 };
-
 export default config;

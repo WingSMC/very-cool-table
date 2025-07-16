@@ -1,4 +1,9 @@
+import Aura from '@primeuix/themes/aura';
 import type { Preview } from '@storybook/vue3-vite';
+import { setup } from '@storybook/vue3-vite';
+import PrimeVue from 'primevue/config';
+
+import { ContextMenu } from 'primevue';
 import './style.css';
 
 const preview: Preview = {
@@ -20,3 +25,8 @@ const preview: Preview = {
 };
 
 export default preview;
+
+setup((app, _ctx) => {
+	app.use(PrimeVue, { theme: { preset: Aura } });
+	app.component('ContextMenu', ContextMenu);
+});

@@ -1,10 +1,2 @@
 @import 'tailwindcss';
-
-@theme {
-	--color-cell-inherit: black;
-	--spacing-cell-height: 40px;
-	--inset-shadow-select: inset 0px 0px 1rem 2rem
-		var(--tw-inset-shadow-color);
-	--text-shadow-2xl: 0 0 2rem
-		var(--tw-text-shadow-color);
-}
+@import 'primeicons/primeicons.css';
