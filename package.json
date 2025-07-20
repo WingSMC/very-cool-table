@@ -11,6 +11,17 @@
 		"type": "git",
 		"url": "https://github.com/WingSMC/very-cool-table.git"
 	},
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
 	"scripts": {
 		"dev": "vite",
 		"build": "vue-tsc -b && vite build",
@@ -25,31 +36,30 @@
 		"@storybook/addon-vitest": "^9.0.15",
 		"@storybook/vue3-vite": "^9.0.15",
 		"@tailwindcss/vite": "^4.1.11",
-		"@types/lodash": "^4.17.20",
 		"@types/node": "^24.0.10",
 		"@vitejs/plugin-vue": "^6.0.0",
 		"@vitest/browser": "^3.2.4",
 		"@vitest/coverage-v8": "^3.2.4",
 		"@vue/tsconfig": "^0.7.0",
+		"@vueuse/core": "^13.5.0",
 		"playwright": "^1.53.2",
+		"primeicons": "^7.0.0",
+		"primevue": "^4.3.6",
 		"storybook": "^9.0.15",
 		"tailwindcss": "^4.1.11",
 		"typescript": "~5.8.3",
 		"vite": "^7.0.0",
+		"vite-plugin-dts": "^4.5.4",
+		"vite-plugin-vue-devtools": "^7.7.7",
 		"vitest": "^3.2.4",
-		"vue-tsc": "^3.0.1",
-		"@vueuse/core": "^13.5.0",
 		"vue": "^3.5.17",
-		"primeicons": "^7.0.0",
-		"primevue": "^4.3.6",
-		"lodash": "^4.17.21"
+		"vue-tsc": "^3.0.1"
 	},
 	"peerDependencies": {
 		"@vueuse/core": "13.x",
-		"vue": ">= 3.5 < 4",
-		"primevue": "4.x",
 		"primeicons": "7.x",
-		"lodash": "4.x"
+		"primevue": "4.x",
+		"vue": ">= 3.5 < 4"
 	},
 	"peerDependenciesMeta": {
 		"primeicons": {

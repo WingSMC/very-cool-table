@@ -1,3 +1,4 @@
+import StringCell from './StringCell.vue';
 import Table from './Table.vue';
 
-export { Table };
+export { StringCell, Table };

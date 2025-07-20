@@ -1,38 +1,59 @@
-<script setup lang="ts" generic="T extends {}">
+<script
+	setup
+	lang="ts"
+	generic="T extends Record<string, any[]>"
+>
+import { ContextMenu } from 'primevue';
 import {
 	computed,
 	provide,
 	ref,
 	useTemplateRef,
 } from 'vue';
-import type { InputProps } from '../types';
+import { useTableEvents } from '../composables/table-event-bindings';
+import { useTableOps } from '../composables/table-ops';
+import { useTableSelection } from '../composables/table-selection';
 import {
 	ColumnTypeEnum,
+	type InputProps,
+} from '../types';
+import {
+	OPERATIONS_SERVICE,
 	SELECTION_SERVICE,
-	useTableOps,
-	useTableSelection,
-	type ColumnKey,
-	type SomeColumn,
 } from '../util';
-import { useTableEvents } from '../util/functions/table-event-bindings';
 import StringCell from './StringCell.vue';
 
-const table = defineModel<T>({ required: true });
-const columns = defineModel<ColumnKey<T>[]>(
-	'columns',
-	{ required: true },
-);
+/**
+ * The data to display in the table.
+ * Should be an object with keys as column names and values as arrays of column data.
+ * You should not alter this object directly, but rather use the exposed operations to modify it.
+ */
+const table = defineModel<Record<string, any[]>>({
+	required: true,
+});
+
+/**
+ * The columns to display in the table.
+ * Should be an array of column names.
+ * Their order is the order in which they will be displayed.
+ */
+const columns = defineModel<string[]>('columns', {
+	required: true,
+});
 
 const props = withDefaults(
-	defineProps<InputProps<T>>(),
+	defineProps<InputProps>(),
 	{
+		editable: true,
 		allowAddCols: true,
 		allowAddRows: true,
-		editable: true,
+		defaultColumnValue: '',
+		defaultColumnType: ColumnTypeEnum.String,
+		defaultColumnPrecision: 2,
 		defaultColumnColor: '#000000',
 		readonlyColumns: () => [],
 		columnColors: () => ({}),
-		defaultValues: () => ({}),
+		defaultColumnValues: () => ({}),
 		columnTypes: () => ({}),
 		columnPrecisions: () => ({}),
 		extraHeaderMenuItems: () => [],
@@ -50,20 +71,29 @@ const typeToComponentMap = computed<
 	...props.overrideTypeToCellComponentTypeMap,
 }));
 
+const firstColumnLength = computed(
+	() =>
+		table.value[columns.value[0]]?.length ?? 0,
+);
+
+const keyColumn = ref<symbol[]>(
+	Array.from(
+		{ length: firstColumnLength.value },
+		() => Symbol('vct-row-key'),
+	),
+);
+
 const sel = useTableSelection(
 	columns,
 	props,
-	computed(() => {
-		return table.value[
-			props.keyColumn
-		] as SomeColumn;
-	}),
+	keyColumn,
 );
 const ops = useTableOps(
 	table,
 	columns,
 	props,
 	sel,
+	keyColumn,
 );
 useTableEvents(
 	props,
@@ -72,7 +102,14 @@ useTableEvents(
 	useTemplateRef('tableContainer'),
 );
 
+defineExpose({
+	selection: sel,
+	operations: ops,
+	keyColumn,
+});
+
 provide(SELECTION_SERVICE, sel);
+provide(OPERATIONS_SERVICE, ops);
 
 const menu = ref();
 const ctxMenuCol = ref<
@@ -84,7 +121,7 @@ const ctxMenuCol = ref<
 >(undefined);
 
 const editableMenuItems = computed(() =>
-	props.editable
+	props.editable && props.allowAddCols
 		? [
 				{
 					label: 'Move Right',
@@ -112,19 +149,19 @@ const editableMenuItems = computed(() =>
 		: [],
 );
 
-const menuItems = computed(() => {
+const ctxHeaderItem = computed(() => {
 	return [
 		...props.extraHeaderMenuItems,
 		...editableMenuItems.value,
 	];
 });
 
-function showHeaderCtxMenu(
+function ctxHeaderShow(
 	event: MouseEvent,
 	colName: string,
 	colIndex: number,
 ) {
-	if (menuItems.value.length === 0) return;
+	if (ctxHeaderItem.value.length === 0) return;
 
 	ctxMenuCol.value = {
 		name: colName,
@@ -135,31 +172,21 @@ function showHeaderCtxMenu(
 </script>
 
 <template>
-	<div>
+	<div class="select-none">
 		<div
-			class="shadow-lg rounded-lg relative z-1"
+			class="table"
 			ref="tableContainer"
 		>
-			<div class="bclg-table-header">
-				<!-- prettier-ignore -->
+			<div class="table-header">
 				<ContextMenu
 					ref="menu"
-					class="
-					[&_.p-contextmenu-root-list]:!grid
-					[&_.p-contextmenu-root-list]:grid-cols-[min-content_min-content_min-content]
-					[&_.p-contextmenu-item]:col-span-3
-					[&_.p-contextmenu-item]:!grid
-					[&_.p-contextmenu-item]:grid-cols-subgrid
-					[&_.p-contextmenu-item-content]:col-span-3
-					[&_.p-contextmenu-item-content]:grid
-					[&_.p-contextmenu-item-content]:grid-cols-subgrid
-					"
-					:model="menuItems"
+					class="context-menu"
+					:model="ctxHeaderItem"
 					@hide="ctxMenuCol = undefined"
 				>
 					<template #item="{ item, props }">
 						<div
-							class="col-span-3 !grid grid-cols-subgrid !gap-4  items-center"
+							class="context-menu-row"
 							v-bind="props.action"
 						>
 							<span :class="item.icon" />
@@ -168,11 +195,10 @@ function showHeaderCtxMenu(
 							}}</span>
 							<span
 								v-if="item.kbd"
-								class="flex items-center gap-1"
+								class="kbd-cell"
 							>
 								<kbd
 									v-for="key in item.kbd"
-									class="inline-block px-1.5 py-0.5 text-xs font-mono border rounded"
 									:key="key"
 									>{{ key }}</kbd
 								>
@@ -183,7 +209,7 @@ function showHeaderCtxMenu(
 
 				<div
 					v-for="(col, i) in columns"
-					class="bclg-table-header-cell bclg-table-cell flex gap-4 flex-row-reverse justify-between items-center"
+					class="table-header-cell table-cell"
 					aria-haspopup="true"
 					:key="col"
 					:class="{ even: i % 2 === 0 }"
@@ -194,28 +220,23 @@ function showHeaderCtxMenu(
 					}"
 					@click="sel.selectColumn(i)"
 					@contextmenu="
-						showHeaderCtxMenu($event, col, i)
+						ctxHeaderShow($event, col, i)
 					"
 				>
-					<span
-						class="header-title select-none after:rotate-90"
-						>{{ col }}</span
-					>
+					<span class="header-title">{{
+						col
+					}}</span>
 				</div>
 			</div>
 
-			<div
-				class="bclg-table-body overflow-hidden"
-			>
+			<div class="table-body">
 				<div
-					class="bclg-table-column relative"
+					class="table-column"
 					v-for="(colName, col) in columns"
 					:key="colName"
 					:class="{
 						selected: sel.isColumnSelected(col),
 						even: col % 2 === 0,
-						'cursor-not-allowed':
-							readonlyColumns.includes(colName),
 					}"
 					:style="{
 						'--color-vct-cell-inherit':
@@ -224,25 +245,25 @@ function showHeaderCtxMenu(
 					}"
 				>
 					<Component
-						v-for="(_, row) in table[colName] as SomeColumn"
-						class="bclg-table-cell select-none"
+						v-for="(_, row) in table[colName]"
+						class="table-cell"
 						:is="
 							typeToComponentMap[
 								props.columnTypes[colName] ??
-									ColumnTypeEnum.String
+									defaultColumnType
 							]
 						"
 						:class="{
 							even: row % 2 === 0,
 							selected: sel.isRowSelected(row),
 						}"
-						:key="row"
+						:key="keyColumn[row]"
 						:editing="sel.isEditedCell(col, row)"
 						:readonly="
-							readonlyColumns.includes(colName) ||
-							!editable
+							!editable ||
+							readonlyColumns.includes(colName)
 						"
-						v-model.lazy="(table[colName] as SomeColumn)[row]"
+						v-model.lazy="table[colName][row]"
 						@mousedown="
 							sel.onSelectionStart(
 								col,
@@ -271,11 +292,11 @@ function showHeaderCtxMenu(
 
 		<div
 			v-if="editable"
-			class="relative -top-1 z-0"
+			class="table-actions"
 		>
 			<button
 				v-if="allowAddRows"
-				class="absolute rounded-b-md h-9 w-20 px-4 py-1.5 text-white font-extrabold hover:bg-blue-600 cursor-pointer bg-blue-500"
+				class="table-action-button"
 				type="button"
 				@click="ops.pushRow"
 				>+Row</button
@@ -283,7 +304,7 @@ function showHeaderCtxMenu(
 
 			<button
 				v-if="allowAddCols"
-				class="absolute rounded-b-md h-9 w-20 px-4 py-1.5 text-white font-extrabold hover:bg-blue-600 cursor-pointer bg-blue-500 left-24"
+				class="table-action-button"
 				type="button"
 				@click="ops.pushColumn"
 				>+Col</button
@@ -293,6 +314,7 @@ function showHeaderCtxMenu(
 </template>
 
 <style>
+@reference '../../.storybook/style.css';
 :root {
 	--color-vct-cell-inherit: black;
 	--spacing-vct-cell-height: 40px;
@@ -301,46 +323,57 @@ function showHeaderCtxMenu(
 	--inset-shadow-vct: inset 0px 0px 3rem 0rem
 		var(--tw-inset-shadow-color);
 }
+
+.context-menu {
+	.p-contextmenu-root-list,
+	.p-contextmenu-item,
+	.p-contextmenu-item-content {
+		@apply !grid;
+	}
+
+	.p-contextmenu-root-list {
+		@apply grid-cols-[min-content_min-content_min-content];
+	}
+
+	.p-contextmenu-item,
+	.p-contextmenu-item-content {
+		@apply col-span-3 grid-cols-subgrid;
+	}
+}
 </style>
 
 <style scoped>
 @reference '../../.storybook/style.css';
 
-@theme {
-	--color-vct-cell-inherit: black;
-	--spacing-vct-cell-height: 40px;
-	--text-shadow-vct: 0 0 2rem
-		var(--color-vct-cell-inherit);
-
-	--inset-shadow-vct: inset 0px 0px 3rem 0rem
-		var(--tw-inset-shadow-color);
+.table {
+	@apply shadow-lg rounded-lg relative z-1 w-full;
 }
 
-.bclg-table-header,
-.bclg-table-body {
+.table-header,
+.table-body {
 	@apply grid grid-rows-1 grid-cols-[repeat(auto-fit,minmax(0,1fr))];
 }
-.bclg-table-header {
+.table-header {
 	@apply z-10 h-full sticky top-0;
 }
-.bclg-table-body {
-	@apply relative z-0;
+.table-body {
+	@apply relative z-0 overflow-hidden;
 }
 
-.bclg-table-column {
+.table-column {
 	&:first-child {
-		.bclg-table-cell {
+		.table-cell {
 			@apply last:rounded-bl-lg;
 		}
 	}
 	&:last-child {
-		.bclg-table-cell {
+		.table-cell {
 			@apply last:rounded-br-lg;
 		}
 	}
 }
 
-.bclg-table-cell {
+.table-cell {
 	@apply h-vct-cell-height
 		leading-vct-cell-height
 		text-center
@@ -360,54 +393,59 @@ function showHeaderCtxMenu(
 		[.selected+.selected]:!border-t-transparent
 		has-[+.selected]:!border-b-transparent
 		[.selected>.selected]:inset-shadow-vct
-		[.selected>.selected]:inset-shadow-blue-300/20;
-
-	.exclamation {
-		@apply text-orange-500 bg-orange-500/10 [.even]:bg-orange-500/20;
-
-		mat-form-field {
-			@apply relative;
-
-			&::after {
-				@apply absolute right-1 top-1/2 -translate-y-1/2;
-			}
-		}
-		.cell-label::after,
-		mat-form-field::after {
-			@apply content-['!'] font-bold;
-		}
-	}
-
-	.cell-label {
-		@apply select-none;
+		[.selected>.selected]:inset-shadow-blue-300/20
+		
+		w-full outline-none shadow-black/30;
+}
+input.table-cell {
+	appearance: textfield;
+	&::-webkit-outer-spin-button,
+	&::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
 	}
 }
-.bclg-table-header-cell {
+.table-header-cell {
 	@apply py-2 px-1
 		h-full
 		leading-normal
 		[writing-mode:vertical-lr]
-		border-b-4
-		border-b-vct-cell-inherit
+		border-b-4 border-b-vct-cell-inherit
 		text-shadow-vct
-		[&.highlight>.header-title]:before:content-['@']
-		first:rounded-tl-lg
-		last:rounded-tr-lg;
+		first:rounded-tl-lg last:rounded-tr-lg
+		flex gap-4 flex-row-reverse justify-between items-center;
+}
+.header-title {
+	@apply select-none;
 }
 
-.table-cell-input {
-	width: 100%;
-	text-align: center;
+.table-actions {
+	@apply relative -top-1 z-0;
+}
 
-	input {
-		appearance: textfield;
-		color: inherit;
-
-		&::-webkit-outer-spin-button,
-		&::-webkit-inner-spin-button {
-			-webkit-appearance: none;
-			margin: 0;
-		}
+.table-action-button {
+	@apply absolute rounded-b-md h-9 w-20 px-4 py-1.5 text-white font-extrabold hover:bg-blue-600 cursor-pointer bg-blue-500;
+	&:nth-child(2) {
+		left: 5.5rem;
 	}
+}
+
+.context-menu-row {
+	@apply col-span-3 !grid grid-cols-subgrid !gap-4  items-center;
+
+	kbd {
+		@apply inline-block px-1.5 py-0.5 text-xs font-mono border rounded;
+	}
+}
+
+.kbd-cell {
+	@apply flex items-center gap-1;
+}
+
+.whitespace-nowrap {
+	@apply whitespace-nowrap;
+}
+.select-none {
+	@apply select-none;
 }
 </style>

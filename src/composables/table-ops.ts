@@ -1,85 +1,34 @@
-import { triggerRef, type ModelRef } from 'vue';
-import type { TableProps } from '../../types';
+import type { Mutable } from '@vueuse/core';
+import {
+	triggerRef,
+	type ModelRef,
+	type Ref,
+} from 'vue';
+import {
+	ColumnTypeEnum,
+	type TableProps,
+} from '../types';
 import type { SelectionService } from './table-selection';
 
-type StringKey<T> = Exclude<
-	keyof T,
-	number | symbol
->;
-
-export type KeysOfType<T, V> = {
-	[K in StringKey<T>]: T[K] extends V ? K : never;
-}[StringKey<T>];
-
-export const ColumnTypeEnum = {
-	//  Basic types (lower 8 bits)
-	BasicTypeMask: 0b1111_1111,
-	Number: 0b0000_0001,
-	String: 0b0000_0010,
-	Boolean: 0b0000_0100,
-} as const;
-
-export type ColumnType =
-	(typeof ColumnTypeEnum)[keyof typeof ColumnTypeEnum];
-
-type Col<T> = T[];
-
-export type SomeColumn =
-	| Col<string>
-	| Col<number>;
-
-export type ColumnKey<T> = KeysOfType<
-	T,
-	SomeColumn
->;
-
-export type NumberColumnKey<T> = KeysOfType<
-	T,
-	Col<number>
->;
-
-export type CellKeyToPrecisionMap<T> = Partial<
-	Record<NumberColumnKey<T>, -1 | 0 | 2>
->;
-
-export type ColumnTypes<T> = Partial<
-	Record<ColumnKey<T>, ColumnType>
->;
-
-export type ColumnValueType<
-	C extends SomeColumn,
-> = C extends Col<string> ? string : number;
-
-export type CellKeyToDefaultValueMap<T> =
-	Partial<{
-		[K in ColumnKey<T>]: T[K] extends SomeColumn
-			? ColumnValueType<T[K]>
-			: never;
-	}>;
-
-export type ColumnMap<T> = Record<
-	ColumnKey<T>,
-	T[ColumnKey<T>]
->;
-export type PartialColumnMap<V> = Partial<
-	ColumnMap<V>
->;
-
-export function useTableOps<T extends {}>(
-	table: ModelRef<T>,
-	columns: ModelRef<ColumnKey<T>[]>,
-	props: TableProps<T>,
-	sel: SelectionService<T>,
+export function useTableOps(
+	table: ModelRef<Record<string, any[]>>,
+	columns: ModelRef<string[]>,
+	props: TableProps,
+	sel: SelectionService,
+	keyColumn: Ref<symbol[]>,
 ) {
-	function _generateUniqueColumnKey(
-		base: string,
-	): ColumnKey<T> {
-		let i = 0;
-		let key: ColumnKey<T>;
-		do {
-			key = `${base}${i}` as ColumnKey<T>;
+	function _generateUniqueColumnKey(): string {
+		let key =
+			prompt(
+				'Enter a unique column name or a new one will be generated:',
+			) ?? `col-0`;
+
+		let i = 1;
+		while (key in table.value) {
+			key = `col-${i}`;
 			i++;
-		} while (key in table.value);
+		}
+
 		return key;
 	}
 
@@ -88,13 +37,18 @@ export function useTableOps<T extends {}>(
 			return;
 		}
 
-		const colName =
-			_generateUniqueColumnKey('col');
+		const colName = _generateUniqueColumnKey();
 		columns.value.push(colName);
-		table.value[colName] = Array.from(
+		(
+			table.value as Mutable<
+				Record<string, any[]>
+			>
+		)[colName] = Array.from(
 			{ length: sel.lastRowIndex.value + 1 },
-			() => props.defaultValues[colName] ?? '',
-		) as T[ColumnKey<T>];
+			() =>
+				props.defaultColumnValues[colName] ??
+				props.defaultColumnValue,
+		);
 	}
 
 	function insertColumn() {
@@ -106,19 +60,16 @@ export function useTableOps<T extends {}>(
 		if (!s) return;
 
 		const index = s.start.col + 1;
-		const colName = (prompt(
-			'Enter column name:',
-		) ??
-			_generateUniqueColumnKey(
-				'col',
-			)) as ColumnKey<T>;
+		const colName = _generateUniqueColumnKey();
 
 		columns.value.splice(index, 0, colName);
 		triggerRef(columns);
 		table.value[colName] = Array.from(
 			{ length: sel.lastRowIndex.value + 1 },
-			() => props.defaultValues[colName] ?? '',
-		) as T[ColumnKey<T>];
+			() =>
+				props.defaultColumnValues[colName] ??
+				props.defaultColumnValue,
+		);
 	}
 
 	function deleteColumns() {
@@ -140,7 +91,6 @@ export function useTableOps<T extends {}>(
 		for (const key of keys) {
 			delete table.value[key];
 		}
-		// triggerRef(table);
 	}
 
 	function pushRow() {
@@ -151,10 +101,13 @@ export function useTableOps<T extends {}>(
 		for (const column of columns.value) {
 			if (!table.value[column]) continue;
 
-			const v = props.defaultValues[column] ?? '';
-			// @ts-expect-error ts is dumb
+			const v =
+				props.defaultColumnValues[column] ??
+				props.defaultColumnValue;
 			table.value[column].push(v);
 		}
+
+		keyColumn.value.push(Symbol());
 	}
 
 	function insertRow() {
@@ -166,14 +119,16 @@ export function useTableOps<T extends {}>(
 
 		for (const column of columns.value) {
 			if (!table.value[column]) continue;
-			(table.value[column] as SomeColumn).splice(
+			table.value[column].splice(
 				i,
 				0,
-				(props.defaultValues[column] as never) ??
-					'',
+				props.defaultColumnValues[column] ??
+					props.defaultColumnValue,
 			);
 		}
+		keyColumn.value.splice(i, 0, Symbol());
 		triggerRef(table);
+		triggerRef(keyColumn);
 
 		sel.selection.value!.start.row = i;
 		sel.selection.value!.end.row = i;
@@ -190,14 +145,11 @@ export function useTableOps<T extends {}>(
 
 		for (const column of columns.value) {
 			if (!table.value[column]) continue;
-
-			(table.value[column] as SomeColumn).splice(
-				start,
-				nRows,
-			);
+			table.value[column].splice(start, nRows);
 		}
-
+		keyColumn.value.splice(start, nRows);
 		triggerRef(table);
+		triggerRef(keyColumn);
 
 		if (sel.lastRowIndex.value < end) {
 			sel.selectLastRow();
@@ -205,34 +157,25 @@ export function useTableOps<T extends {}>(
 	}
 
 	function _pasteIntoTableColumn(
-		columnKey: ColumnKey<T>,
+		columnKey: string,
 		index: number,
-		values: SomeColumn,
+		values: any[],
 	) {
 		if (!props.editable) return;
 
 		const overflow =
 			index +
 			values.length -
-			(table.value[columnKey] as SomeColumn)
-				.length;
+			table.value[columnKey].length;
 
 		for (let i = 0; i < overflow; i++) {
 			pushRow();
 		}
 
 		for (let i = 0; i < values.length; i++) {
-			(table.value[columnKey] as SomeColumn)[
-				index + i
-			] = values[i] as never;
+			table.value[columnKey][index + i] =
+				values[i];
 		}
-	}
-
-	function _isColumnReadonly(col: number) {
-		const colKey = columns.value[col];
-		return colKey
-			? props.readonlyColumns.includes(colKey)
-			: false;
 	}
 
 	function paste(e: ClipboardEvent) {
@@ -278,16 +221,13 @@ export function useTableOps<T extends {}>(
 
 			const type =
 				props.columnTypes[column] ??
-				ColumnTypeEnum.String;
+				props.defaultColumnType;
 
-			switch (
-				type & ColumnTypeEnum.BasicTypeMask
-			) {
+			switch (type) {
 				case ColumnTypeEnum.Number: {
 					const precision =
-						props.columnPrecisions[
-							column as unknown as NumberColumnKey<T>
-						] ?? 2;
+						props.columnPrecisions[column] ??
+						props.defaultColumnPrecision;
 					const upscale = 10 ** precision;
 					const values = textRows.map(row => {
 						const cellText = row[columnIndex];
@@ -362,25 +302,20 @@ export function useTableOps<T extends {}>(
 
 		for (let i = startIndex; i <= endIndex; i++) {
 			const row = selectedCols.map(key => {
-				const column = table.value[
-					key
-				] as SomeColumn;
+				const column = table.value[key];
 				if (!column) return '';
 
 				const type =
 					props.columnTypes[key] ??
-					ColumnTypeEnum.String;
+					props.defaultColumnType;
 				const value = column[i];
 
-				switch (
-					type & ColumnTypeEnum.BasicTypeMask
-				) {
+				switch (type) {
 					case ColumnTypeEnum.Number: {
 						const precision =
-							props.columnPrecisions[
-								key as unknown as NumberColumnKey<T>
-							] ?? 2;
-						return (value as number).toFixed(
+							props.columnPrecisions[key] ??
+							props.defaultColumnPrecision;
+						return value.toFixed(
 							precision < 0 ? 0 : precision,
 						);
 					}
@@ -411,7 +346,7 @@ export function useTableOps<T extends {}>(
 			j <= endColumn;
 			++j
 		) {
-			const readonly = _isColumnReadonly(j);
+			const readonly = sel.isColumnReadonly(j);
 			if (readonly) continue;
 
 			const columnName = columns.value[j];
@@ -422,14 +357,45 @@ export function useTableOps<T extends {}>(
 				i <= endIndex;
 				++i
 			) {
-				(table.value[columnName] as SomeColumn)[
-					i
-				] =
-					(props.defaultValues[
-						columnName
-					] as never) ?? '';
+				table.value[columnName][i] =
+					props.defaultColumnValues[columnName] ??
+					props.defaultColumnValue;
 			}
 		}
+	}
+	function _setCellValue(
+		col: number,
+		row: number,
+		value: any,
+	) {
+		if (sel.isColumnReadonly(col)) return;
+
+		const columnName = columns.value[col];
+		if (!table.value[columnName]) return;
+		table.value[columnName][row] = value;
+	}
+	function editSelected(
+		newValue: string,
+		event?: KeyboardEvent,
+	) {
+		if (!props.editable || sel.editedCell.value) {
+			return;
+		}
+
+		const s = sel.singleSelection();
+		if (!s) return;
+
+		const col = s.start.col;
+		const row = s.start.row;
+
+		console.log('editSelected');
+
+		event?.preventDefault();
+		_setCellValue(col, row, newValue);
+		sel.setEditedCell({
+			col,
+			row,
+		});
 	}
 
 	function moveSelCol(dir: -1 | 1) {
@@ -478,8 +444,10 @@ export function useTableOps<T extends {}>(
 		copy,
 		paste,
 		resetCells,
+		editSelected,
 	};
 }
 
-export type TableOpsService<T extends {}> =
-	ReturnType<typeof useTableOps<T>>;
+export type TableOpsService = ReturnType<
+	typeof useTableOps
+>;

@@ -15,24 +15,34 @@ const inputRef =
 	useTemplateRef<HTMLInputElement>('input');
 
 whenever(
-	() => editing,
+	() => !readonly && editing,
 	() => {
 		const el = inputRef.value!;
 		el.focus();
 		el.select();
 	},
+	{ flush: 'post' },
 );
 </script>
 
 <template>
 	<input
 		ref="input"
-		class="size-full outline-none shadow-black/30"
 		type="text"
 		v-model.lazy.trim="value"
 		:readonly="!editing || readonly"
-		:class="{
-			'shadow-md relative z-1': editing,
-		}"
+		:class="{ editing, readonly }"
 	/>
 </template>
+
+<style scoped>
+@reference '../../.storybook/style.css';
+
+.editing {
+	@apply shadow-md relative z-1 !border-b-4 !border-b-current;
+}
+
+.readonly {
+	@apply cursor-not-allowed;
+}
+</style>

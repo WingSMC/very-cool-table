@@ -1,18 +1,18 @@
-import { clamp, isEqual } from 'lodash';
 import {
 	computed,
 	ref,
 	watch,
 	type ComputedRef,
 	type ModelRef,
+	type Ref,
 	type ShallowReactive,
 } from 'vue';
-import type { TableProps } from '../../types';
-import type {
-	ColumnKey,
-	SomeColumn,
-} from './table-ops';
-import { blurActiveElement } from './util';
+import type { TableProps } from '../types';
+import {
+	blurActiveElement,
+	clamp,
+	isEqual,
+} from '../util/util';
 
 export type TableSelection = {
 	start: TableSelectionCoord;
@@ -24,14 +24,14 @@ export type TableSelectionCoord = {
 	row: number;
 };
 
-export type SelectionService<T> = ReturnType<
-	typeof useTableSelection<T>
+export type SelectionService = ReturnType<
+	typeof useTableSelection
 >;
 
-export function useTableSelection<T>(
-	columns: ModelRef<ColumnKey<T>[]>,
-	props: ShallowReactive<TableProps<T>>,
-	keyColumnData: ComputedRef<SomeColumn>,
+export function useTableSelection(
+	columns: ModelRef<string[]>,
+	props: ShallowReactive<TableProps>,
+	keyColumn: Ref<symbol[]>,
 ) {
 	const editedCell = ref<
 		TableSelectionCoord | undefined
@@ -42,7 +42,7 @@ export function useTableSelection<T>(
 		| undefined;
 
 	const lastRowIndex = computed(
-		() => keyColumnData.value.length - 1,
+		() => keyColumn.value.length - 1,
 	);
 	const lastColIndex = computed(
 		() => columns.value.length - 1,
@@ -74,24 +74,29 @@ export function useTableSelection<T>(
 	});
 
 	// Remove focus from everything outside the table
-	watch(selection, (sel, prevSel) => {
-		if (
-			sel === undefined ||
-			isEqual(sel, prevSel)
-		) {
-			return;
-		}
+	watch(
+		selection,
+		sel => {
+			if (!sel) return;
 
-		blurActiveElement();
-		setEditedCell(undefined);
-	});
+			blurActiveElement();
+		},
+		{ deep: true },
+	);
 
 	/* MOUSE DRAG & SHIFT SELECT */
-	function onSelectionStart(
+	function onMouseSelectionStart(
 		col: number,
 		row: number,
 		e: MouseEvent,
 	) {
+		if (
+			editedCell.value &&
+			isEqual(editedCell.value, { col, row })
+		) {
+			return;
+		}
+
 		e.preventDefault();
 
 		if (e.shiftKey && selection.value) {
@@ -106,7 +111,7 @@ export function useTableSelection<T>(
 		const cell = { col, row };
 		selectionStartCell = cell;
 	}
-	function onSelectionMove(
+	function onMouseSelectionMove(
 		column: number,
 		row: number,
 		e: MouseEvent,
@@ -114,11 +119,13 @@ export function useTableSelection<T>(
 		if (
 			(e.buttons | e.button) !== 1 ||
 			e.shiftKey
-		)
+		) {
 			return;
+		}
+
 		_selectionMove(column, row);
 	}
-	function onSelectionEnd(
+	function onMouseSelectionEnd(
 		column: number,
 		row: number,
 	) {
@@ -144,6 +151,7 @@ export function useTableSelection<T>(
 
 	/* SELECT */
 	function selectColumn(column: number) {
+		setEditedCell(undefined);
 		selection.value = {
 			start: { col: column, row: 0 },
 			end: {
@@ -154,14 +162,16 @@ export function useTableSelection<T>(
 	}
 	function _selectEditedCell() {
 		const edited = editedCell.value;
-		if (edited === undefined) return;
+		if (!edited) return;
 
+		setEditedCell(undefined);
 		selection.value = {
 			start: edited,
 			end: edited,
 		};
 	}
 	function selectLastRow() {
+		setEditedCell(undefined);
 		const row = lastRowIndex.value;
 		selection.value = {
 			start: { row, col: 0 },
@@ -169,6 +179,7 @@ export function useTableSelection<T>(
 		};
 	}
 	function selectAll() {
+		setEditedCell(undefined);
 		selection.value = {
 			start: { col: 0, row: 0 },
 			end: {
@@ -195,6 +206,7 @@ export function useTableSelection<T>(
 			lastRowIndex.value,
 		);
 
+		setEditedCell(undefined);
 		selection.value!.end = { col, row };
 	}
 	function getSelection() {
@@ -204,7 +216,10 @@ export function useTableSelection<T>(
 	function singleSelection() {
 		const s = getSelection();
 		if (!s) return;
-		selection.value!.end = { ...s.start };
+		document.getSelection()?.removeAllRanges();
+		setEditedCell(undefined);
+		selection.value!.start = { ...s.end };
+		return selection.value;
 	}
 	function constrainToCol():
 		| TableSelection
@@ -215,21 +230,21 @@ export function useTableSelection<T>(
 		selection.value!.end.col = s.start.col;
 		return selection.value;
 	}
-	function move(colDir: number, rowDir: number) {
-		const s = getSelection();
+	function move(
+		colDir: number,
+		rowDir: number,
+		single = true,
+	) {
+		const s = single
+			? singleSelection()
+			: getSelection();
 		if (!s) return;
-
-		/* 		const isSingleCell = isEqual(
-			s.start,
-			s.end,
-		) */
 
 		const scol = clamp(
 			s.start.col + colDir,
 			0,
 			lastColIndex.value,
 		);
-
 		const srow = clamp(
 			s.start.row + rowDir,
 			0,
@@ -253,33 +268,28 @@ export function useTableSelection<T>(
 		selection.value!.end.row = erow;
 	}
 
-	/* DESELECT */
-	/* function deselectSelectionThenSetEditedCell(
-		col: number,
-		row: number,
-	) {
-		deselect();
-		setEditedCell({ col, row });
-	} */
 	function deselect() {
 		selection.value = undefined;
 		selectionStartCell = undefined;
-		editedCell.value = undefined;
+		setEditedCell(undefined);
 	}
 
-	/* EDIT / END EDIT */
 	function setEditedCell(
 		coord: TableSelectionCoord | undefined,
 	) {
-		if (!props.editable) return;
+		if (
+			!props.editable ||
+			(coord && isColumnReadonly(coord.col))
+		) {
+			return;
+		}
+
 		editedCell.value = coord;
 	}
 
 	/* IS... */
 	function isColumnSelected(column: number) {
-		if (selection.value === undefined) {
-			return false;
-		}
+		if (!selection.value) return false;
 
 		const minCol = selTopLeft.value!.col;
 		const maxCol = selBottomRight.value!.col;
@@ -300,13 +310,18 @@ export function useTableSelection<T>(
 		column: number,
 		index: number,
 	) {
-		if (editedCell.value === undefined)
-			return false;
+		if (!editedCell.value) return false;
 
 		return (
 			editedCell.value.col === column &&
 			editedCell.value.row === index
 		);
+	}
+	function isColumnReadonly(col: number) {
+		const colKey = columns.value[col];
+		return colKey
+			? props.readonlyColumns.includes(colKey)
+			: false;
 	}
 
 	const hasNoSelection = computed(
@@ -322,9 +337,9 @@ export function useTableSelection<T>(
 		editedCell: editedCell as ComputedRef<
 			TableSelectionCoord | undefined
 		>,
-		onSelectionStart,
-		onSelectionMove,
-		onSelectionEnd,
+		onSelectionStart: onMouseSelectionStart,
+		onSelectionMove: onMouseSelectionMove,
+		onSelectionEnd: onMouseSelectionEnd,
 		selectColumn,
 		selectLastRow,
 		selectAll,
@@ -346,6 +361,7 @@ export function useTableSelection<T>(
 		moveDown: () => move(0, 1),
 		deselect,
 
+		isColumnReadonly,
 		isColumnSelected,
 		isRowSelected,
 		isEditedCell,
