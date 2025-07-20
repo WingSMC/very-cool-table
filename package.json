@@ -3,6 +3,14 @@
 	"private": false,
 	"version": "0.0.0",
 	"type": "module",
+	"description": "A very cool table component for Vue 3",
+	"keywords": [
+		"vue",
+		"vue3",
+		"table",
+		"component",
+		"ui"
+	],
 	"author": {
 		"name": "Gergely Dremák (WingSMC)",
 		"url": "https://github.com/WingSMC"
