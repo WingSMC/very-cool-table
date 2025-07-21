@@ -1,5 +1,7 @@
 # Just a nice table with excel-like copy/paste functionality
 
+You can play with the component and it's props here: [very-cool-table storybook](https://wingsmc.github.io/very-cool-table/)
+
 ## Installation
 
 ```sh
