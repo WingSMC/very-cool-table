@@ -22,12 +22,12 @@ app.use(PrimeVue, {
 Optionally add this to your css or main.js/ts:
 
 ```css
-@import '@wingsmc/very-cool-table/very-cool-table.css';
+@import 'very-cool-table/style.css';
 @import 'primeicons/primeicons.css';
 ```
 
 ```js
-import '@wingsmc/very-cool-table/very-cool-table.css';
+import 'very-cool-table/style.css';
 import 'primeicons/primeicons.css';
 ```
 

@@ -29,17 +29,23 @@
 		".": {
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
+		},
+		"./style.css": {
+			"import": "./dist/index.css"
 		}
+	},
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org/"
 	},
 	"scripts": {
 		"dev": "vite",
 		"build": "vue-tsc -b && vite build",
 		"preview": "vite preview",
 		"storybook": "storybook dev -p 6006",
-		"storybook:build": "storybook build",
+		"build-storybook": "storybook build",
 		"local-release": "changeset version && changeset publish",
-		"ci": "nr build && nr test && nr storybook:build",
-		"prepublishOnly": "nr ci"
+		"ci": "pnpm run build && pnpm run build-storybook",
+		"prepublishOnly": "pnpm run build"
 	},
 	"devDependencies": {
 		"@changesets/cli": "^2.29.5",
