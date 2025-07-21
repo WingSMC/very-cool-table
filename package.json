@@ -44,7 +44,7 @@
 		"storybook": "storybook dev -p 6006",
 		"build-storybook": "storybook build",
 		"local-release": "changeset version && changeset publish",
-		"ci": "pnpm run build && pnpm run build-storybook",
+		"ci": "pnpm run build",
 		"prepublishOnly": "pnpm run build"
 	},
 	"devDependencies": {
