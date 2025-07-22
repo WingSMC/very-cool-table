@@ -11,7 +11,7 @@ export type ColumnType =
 	(typeof ColumnTypeEnum)[keyof typeof ColumnTypeEnum];
 
 export type CellKeyToPrecisionMap = Partial<
-	Record<string, -1 | 0 | 2>
+	Record<string, number>
 >;
 export type CellKeyToDefaultValueMap = Record<
 	string,
@@ -73,7 +73,11 @@ export type InputProps = {
 	/**
 	 * List of column names that are read-only / cannot be edited.
 	 */
-	readonlyColumns?: string[];
+	readonlyColumns?:
+		| string[]
+		| {
+				includes: (col: string) => boolean;
+		  };
 
 	/**
 	 * Extra menu items to add to the header context menu.
@@ -81,13 +85,29 @@ export type InputProps = {
 	extraHeaderMenuItems?: MenuItem[];
 
 	/**
+	 * Column to cell component type map.
+	 * This is used to map column types to specific cell components.
+	 * Defaults to the internal `typeToCellComponentTypeMap` that is
+	 * computed from `overrideTypeToCellComponentTypeMap`.
+	 */
+	columnToCellComponentTypeMap?: Record<
+		string,
+		any
+	>;
+
+	/**
 	 * Override the default cell component types for specific column types.
 	 * You can use this to use custom cell components for specific column types.
 	 */
 	overrideTypeToCellComponentTypeMap?: Record<
-		ColumnType | number,
+		string,
 		any
 	>;
+
+	/**
+	 * Changes header text direction to vertical.
+	 */
+	verticalHeader?: boolean;
 };
 
 export type TableProps = Required<InputProps>;

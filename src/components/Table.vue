@@ -1,8 +1,4 @@
-<script
-	setup
-	lang="ts"
-	generic="T extends Record<string, any[]>"
->
+<script setup lang="ts">
 import { ContextMenu } from 'primevue';
 import {
 	computed,
@@ -21,7 +17,8 @@ import {
 	OPERATIONS_SERVICE,
 	SELECTION_SERVICE,
 } from '../util';
-import StringCell from './StringCell.vue';
+import MultilineStringCell from './MultilineStringCell.vue';
+import NumberCell from './NumberCell.vue';
 
 /**
  * The data to display in the table.
@@ -47,6 +44,7 @@ const props = withDefaults(
 		editable: true,
 		allowAddCols: true,
 		allowAddRows: true,
+		verticalHeader: false,
 		defaultColumnValue: '',
 		defaultColumnType: ColumnTypeEnum.String,
 		defaultColumnPrecision: 2,
@@ -57,6 +55,7 @@ const props = withDefaults(
 		columnTypes: () => ({}),
 		columnPrecisions: () => ({}),
 		extraHeaderMenuItems: () => [],
+		columnToCellComponentTypeMap: () => ({}),
 		overrideTypeToCellComponentTypeMap:
 			() => ({}),
 	},
@@ -65,9 +64,8 @@ const props = withDefaults(
 const typeToComponentMap = computed<
 	Record<number, any>
 >(() => ({
-	[ColumnTypeEnum.Number]: StringCell,
-	[ColumnTypeEnum.String]: StringCell,
-	[ColumnTypeEnum.Boolean]: StringCell,
+	[ColumnTypeEnum.Number]: NumberCell,
+	[ColumnTypeEnum.String]: MultilineStringCell,
 	...props.overrideTypeToCellComponentTypeMap,
 }));
 
@@ -79,9 +77,18 @@ const firstColumnLength = computed(
 const keyColumn = ref<symbol[]>(
 	Array.from(
 		{ length: firstColumnLength.value },
-		() => Symbol('vct-row-key'),
+		() => Symbol(),
 	),
 );
+
+const ctxMenuTarget = ref<
+	| {
+			colName: string;
+			col: number;
+			row?: number;
+	  }
+	| undefined
+>(undefined);
 
 const sel = useTableSelection(
 	columns,
@@ -99,216 +106,313 @@ useTableEvents(
 	props,
 	sel,
 	ops,
+	ctxMenuTarget,
 	useTemplateRef('tableContainer'),
 );
 
 defineExpose({
 	selection: sel,
 	operations: ops,
-	keyColumn,
+	/**
+	 * The keyColumn is internally used to uniquely identify the rows of the table.
+	 *
+	 * This is the reason why the modification of the table outside the component is not recommended.
+	 * If you need to modify the table, use the provided operations instead or keep this in sync with the table data.
+	 *
+	 * This is a getter to the ref because the ref would be unwrapped by Vue.
+	 */
+	getKeyColumn: () => keyColumn,
+	ctxMenuTarget,
+	props,
 });
 
 provide(SELECTION_SERVICE, sel);
 provide(OPERATIONS_SERVICE, ops);
 
-const menu = ref();
-const ctxMenuCol = ref<
-	| {
-			name: string;
-			index: number;
-	  }
-	| undefined
->(undefined);
-
-const editableMenuItems = computed(() =>
-	props.editable && props.allowAddCols
+const menu = useTemplateRef('menu');
+const ctxTargetReadonly = computed(() => {
+	return (
+		ctxMenuTarget.value &&
+		props.readonlyColumns.includes(
+			ctxMenuTarget.value.colName,
+		)
+	);
+});
+const ctxColEditItems = computed(() =>
+	props.allowAddCols
 		? [
 				{
-					label: 'Move Right',
+					label: 'Move Column Right',
 					icon: 'pi pi-arrow-right',
 					kbd: ['Alt', '→'],
 					command: () => {
-						sel.selectColumn(
-							ctxMenuCol.value!.index,
-						);
+						const t = ctxMenuTarget.value!;
+						if (t.row) {
+							sel.selectCell(t.col, t.row);
+						} else {
+							sel.selectColumn(t.col);
+						}
+
 						ops.moveSelCol(1);
 					},
 				},
 				{
-					label: 'Move Left',
+					label: 'Move Column Left',
 					icon: 'pi pi-arrow-left',
 					kbd: ['Alt', '←'],
 					command: () => {
-						sel.selectColumn(
-							ctxMenuCol.value!.index,
-						);
+						const t = ctxMenuTarget.value!;
+						if (t.row) {
+							sel.selectCell(t.col, t.row);
+						} else {
+							sel.selectColumn(t.col);
+						}
+
 						ops.moveSelCol(-1);
+					},
+				},
+				{
+					label: 'Insert Column',
+					icon: 'pi pi-plus',
+					kbd: ['Ctrl', 'Shift', 'Enter'],
+					command: () => {
+						const t = ctxMenuTarget.value!;
+						if (t.row) {
+							sel.selectCell(t.col, t.row);
+						} else {
+							sel.selectColumn(t.col);
+						}
+
+						ops.insertColumn();
+					},
+				},
+				{
+					label: 'Delete Column',
+					icon: 'pi pi-trash',
+					kbd: ['Ctrl', 'Shift', 'Delete'],
+					disabled: ctxTargetReadonly.value,
+					command: () => {
+						const t = ctxMenuTarget.value!;
+						if (t.row) {
+							sel.selectCell(t.col, t.row);
+						} else {
+							sel.selectColumn(t.col);
+						}
+
+						ops.deleteColumns();
+					},
+				},
+				{
+					label: 'Rename Column',
+					icon: 'pi pi-pencil',
+					kbd: ['Alt', 'R'],
+					disabled: ctxTargetReadonly.value,
+					command: () => {
+						const t = ctxMenuTarget.value!;
+						if (t.row) {
+							sel.selectCell(t.col, t.row);
+							ops.renameSelCol();
+						} else {
+							ops.renameCol(
+								ctxMenuTarget.value!.col,
+							);
+						}
 					},
 				},
 		  ]
 		: [],
 );
+const ctxRowEditItems = computed(() =>
+	props.allowAddRows
+		? [
+				{
+					label: 'Insert Row',
+					icon: 'pi pi-plus',
+					kbd: ['Ctrl', 'Enter'],
+					command: () => {
+						const t = ctxMenuTarget.value!;
+						if (t.row) {
+							ops.insertRowAt(t.row + 1);
+						} else {
+							ops.pushRow();
+						}
+					},
+				},
+				{
+					label: 'Delete Row',
+					icon: 'pi pi-trash',
+					kbd: ['Ctrl', 'Delete'],
+					command: () => {
+						const t = ctxMenuTarget.value!;
+						if (t.row) {
+							sel.selectCell(t.col, t.row);
+						} else {
+							sel.selectColumn(t.col);
+						}
 
-const ctxHeaderItem = computed(() => {
+						ops.deleteRows();
+					},
+				},
+		  ]
+		: [],
+);
+const ctxEditableItems = computed(() =>
+	props.editable
+		? [
+				...ctxColEditItems.value,
+				...ctxRowEditItems.value,
+		  ]
+		: [],
+);
+const ctxMenuItems = computed(() => {
 	return [
 		...props.extraHeaderMenuItems,
-		...editableMenuItems.value,
+		...ctxEditableItems.value,
 	];
 });
-
-function ctxHeaderShow(
+function ctxMenuShow(
 	event: MouseEvent,
 	colName: string,
-	colIndex: number,
+	col: number,
+	row?: number,
 ) {
-	if (ctxHeaderItem.value.length === 0) return;
+	if (ctxMenuItems.value.length === 0) return;
 
-	ctxMenuCol.value = {
-		name: colName,
-		index: colIndex,
+	ctxMenuTarget.value = {
+		colName,
+		col,
+		row,
 	};
-	menu.value.show(event);
+	menu.value?.show(event);
 }
 </script>
 
 <template>
-	<div class="select-none">
-		<div
-			class="table"
-			ref="tableContainer"
+	<div
+		class="table"
+		:class="{ editable }"
+		ref="tableContainer"
+	>
+		<ContextMenu
+			ref="menu"
+			class="vct-context-menu"
+			:model="ctxMenuItems"
+			@hide="ctxMenuTarget = undefined"
 		>
-			<div class="table-header">
-				<ContextMenu
-					ref="menu"
-					class="context-menu"
-					:model="ctxHeaderItem"
-					@hide="ctxMenuCol = undefined"
-				>
-					<template #item="{ item, props }">
-						<div
-							class="context-menu-row"
-							v-bind="props.action"
-						>
-							<span :class="item.icon" />
-							<span class="whitespace-nowrap">{{
-								item.label
-							}}</span>
-							<span
-								v-if="item.kbd"
-								class="kbd-cell"
-							>
-								<kbd
-									v-for="key in item.kbd"
-									:key="key"
-									>{{ key }}</kbd
-								>
-							</span>
-						</div>
-					</template>
-				</ContextMenu>
-
+			<template #item="{ item, props }">
 				<div
-					v-for="(col, i) in columns"
-					class="table-header-cell table-cell"
-					aria-haspopup="true"
-					:key="col"
-					:class="{ even: i % 2 === 0 }"
-					:style="{
-						'--color-vct-cell-inherit':
-							columnColors[col] ??
-							defaultColumnColor,
-					}"
-					@click="sel.selectColumn(i)"
-					@contextmenu="
-						ctxHeaderShow($event, col, i)
-					"
+					class="ctx-row"
+					v-bind="props.action"
 				>
-					<span class="header-title">{{
-						col
+					<span :class="item.icon" />
+					<span class="ctx-label">{{
+						item.label
 					}}</span>
+					<span
+						v-if="item.kbd"
+						class="ctx-kbd"
+					>
+						<kbd
+							v-for="key in item.kbd"
+							:key="key"
+							>{{ key }}</kbd
+						>
+					</span>
 				</div>
-			</div>
+			</template>
+		</ContextMenu>
 
-			<div class="table-body">
-				<div
-					class="table-column"
-					v-for="(colName, col) in columns"
-					:key="colName"
-					:class="{
-						selected: sel.isColumnSelected(col),
-						even: col % 2 === 0,
-					}"
-					:style="{
-						'--color-vct-cell-inherit':
-							columnColors[colName] ??
-							defaultColumnColor,
-					}"
-				>
-					<Component
-						v-for="(_, row) in table[colName]"
-						class="table-cell"
-						:is="
-							typeToComponentMap[
-								props.columnTypes[colName] ??
-									defaultColumnType
-							]
-						"
-						:class="{
-							even: row % 2 === 0,
-							selected: sel.isRowSelected(row),
-						}"
-						:key="keyColumn[row]"
-						:editing="sel.isEditedCell(col, row)"
-						:readonly="
-							!editable ||
-							readonlyColumns.includes(colName)
-						"
-						v-model.lazy="table[colName][row]"
-						@mousedown="
-							sel.onSelectionStart(
-								col,
-								row,
-								$event,
-							)
-						"
-						@mousemove="
-							sel.onSelectionMove(
-								col,
-								row,
-								$event,
-							)
-						"
-						@mouseup="
-							sel.onSelectionEnd(col, row)
-						"
-						@dblclick="
-							editable &&
-								sel.setEditedCell({ col, row })
-						"
-					/>
-				</div>
+		<div class="table-header">
+			<div
+				v-for="(colName, col) in columns"
+				class="table-header-cell table-cell"
+				aria-haspopup="true"
+				:key="colName"
+				:class="{
+					even: col % 2 === 0,
+					vertical: verticalHeader,
+				}"
+				:style="{
+					'--color-vct-cell-inherit':
+						columnColors[colName] ??
+						defaultColumnColor,
+				}"
+				@click="sel.selectColumn(col)"
+				@contextmenu="
+					ctxMenuShow($event, colName, col)
+				"
+			>
+				<span>{{ colName }}</span>
 			</div>
 		</div>
 
 		<div
-			v-if="editable"
-			class="table-actions"
+			class="table-body"
+			:style="`grid-template-rows: repeat(${keyColumn.length},max-content)`"
 		>
-			<button
-				v-if="allowAddRows"
-				class="table-action-button"
-				type="button"
-				@click="ops.pushRow"
-				>+Row</button
+			<div
+				class="table-column"
+				v-for="(colName, col) in columns"
+				:key="colName"
+				:class="{
+					selected: sel.isColumnSelected(col),
+					even: col % 2 === 0,
+				}"
+				:style="{
+					'--color-vct-cell-inherit':
+						columnColors[colName] ??
+						defaultColumnColor,
+				}"
 			>
-
-			<button
-				v-if="allowAddCols"
-				class="table-action-button"
-				type="button"
-				@click="ops.pushColumn"
-				>+Col</button
-			>
+				<Component
+					v-for="(_, row) in table[colName]"
+					class="table-cell"
+					:is="
+						columnToCellComponentTypeMap[
+							colName
+						] ??
+						typeToComponentMap[
+							columnTypes[colName] ??
+								defaultColumnType
+						]
+					"
+					:class="{
+						even: row % 2 === 0,
+						selected: sel.isRowSelected(row),
+					}"
+					:key="keyColumn[row]"
+					:editing="sel.isEditedCell(col, row)"
+					:readonly="
+						readonlyColumns.includes(colName)
+					"
+					:modelValue="table[colName][row]"
+					:defaultValue="
+						defaultColumnValues[colName] ??
+						defaultColumnValue
+					"
+					:precision="
+						columnPrecisions[colName] ??
+						defaultColumnPrecision
+					"
+					@update:modelValue="
+						table[colName][row] = $event
+					"
+					@mousedown="
+						sel.onSelectionStart(col, row, $event)
+					"
+					@mousemove="
+						sel.onSelectionMove(col, row, $event)
+					"
+					@mouseup="sel.onSelectionEnd(col, row)"
+					@dblclick="
+						editable &&
+							sel.setEditedCell({ col, row })
+					"
+					@contextmenu="
+						ctxMenuShow($event, colName, col, row)
+					"
+				/>
+			</div>
 		</div>
 	</div>
 </template>
@@ -324,7 +428,7 @@ function ctxHeaderShow(
 		var(--tw-inset-shadow-color);
 }
 
-.context-menu {
+.vct-context-menu {
 	.p-contextmenu-root-list,
 	.p-contextmenu-item,
 	.p-contextmenu-item-content {
@@ -346,37 +450,38 @@ function ctxHeaderShow(
 @reference '../../.storybook/style.css';
 
 .table {
-	@apply shadow-lg rounded-lg relative z-1 w-full;
-}
+	@apply shadow-lg rounded-lg relative z-1 w-full select-none;
 
-.table-header,
-.table-body {
-	@apply grid grid-rows-1 grid-cols-[repeat(auto-fit,minmax(0,1fr))];
-}
-.table-header {
-	@apply z-10 h-full sticky top-0;
-}
-.table-body {
-	@apply relative z-0 overflow-hidden;
-}
-
-.table-column {
-	&:first-child {
-		.table-cell {
-			@apply last:rounded-bl-lg;
-		}
+	.table-header,
+	.table-body {
+		@apply grid grid-cols-[repeat(auto-fit,minmax(0,1fr))];
 	}
-	&:last-child {
-		.table-cell {
-			@apply last:rounded-br-lg;
+	.table-header {
+		@apply z-10 h-full sticky top-0;
+	}
+	.table-body {
+		@apply relative z-0 overflow-hidden grid-rows-[repeat(3,max-content)];
+
+		.table-column {
+			@apply grid grid-rows-subgrid row-span-full;
+
+			&:first-child {
+				.table-cell {
+					@apply last:rounded-bl-lg;
+				}
+			}
+			&:last-child {
+				.table-cell {
+					@apply last:rounded-br-lg;
+				}
+			}
 		}
 	}
 }
 
 .table-cell {
-	@apply h-vct-cell-height
-		leading-vct-cell-height
-		text-center
+	@apply min-h-vct-cell-height
+		p-1
 		border
 		border-transparent
 		bg-clip-border
@@ -395,8 +500,20 @@ function ctxHeaderShow(
 		[.selected>.selected]:inset-shadow-vct
 		[.selected>.selected]:inset-shadow-blue-300/20
 		
-		w-full outline-none shadow-black/30;
+		w-full outline-none shadow-black/30
+		cursor-default;
+
+	&.editing {
+		@apply shadow-md relative z-1 !border-b-3 !border-b-current;
+	}
 }
+
+.table.editable {
+	.table-cell.readonly {
+		@apply cursor-not-allowed;
+	}
+}
+
 input.table-cell {
 	appearance: textfield;
 	&::-webkit-outer-spin-button,
@@ -405,47 +522,31 @@ input.table-cell {
 		margin: 0;
 	}
 }
+
 .table-header-cell {
-	@apply py-2 px-1
+	@apply p-4
 		h-full
 		leading-normal
-		[writing-mode:vertical-lr]
 		border-b-4 border-b-vct-cell-inherit
 		text-shadow-vct
 		first:rounded-tl-lg last:rounded-tr-lg
-		flex gap-4 flex-row-reverse justify-between items-center;
-}
-.header-title {
-	@apply select-none;
-}
+		flex gap-4 justify-center items-center;
 
-.table-actions {
-	@apply relative -top-1 z-0;
-}
-
-.table-action-button {
-	@apply absolute rounded-b-md h-9 w-20 px-4 py-1.5 text-white font-extrabold hover:bg-blue-600 cursor-pointer bg-blue-500;
-	&:nth-child(2) {
-		left: 5.5rem;
+	&.vertical {
+		@apply [writing-mode:vertical-lr] justify-end;
 	}
 }
 
-.context-menu-row {
+.ctx-row {
 	@apply col-span-3 !grid grid-cols-subgrid !gap-4  items-center;
-
+}
+.ctx-kbd {
+	@apply flex items-center gap-1;
 	kbd {
 		@apply inline-block px-1.5 py-0.5 text-xs font-mono border rounded;
 	}
 }
-
-.kbd-cell {
-	@apply flex items-center gap-1;
-}
-
-.whitespace-nowrap {
+.ctx-label {
 	@apply whitespace-nowrap;
-}
-.select-none {
-	@apply select-none;
 }
 </style>

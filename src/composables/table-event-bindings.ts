@@ -2,7 +2,7 @@ import {
 	onClickOutside,
 	useEventListener,
 } from '@vueuse/core';
-import { type TemplateRef } from 'vue';
+import { type Ref, type TemplateRef } from 'vue';
 import type { TableProps } from '../types';
 import type { TableOpsService } from './table-ops';
 import type { SelectionService } from './table-selection';
@@ -11,75 +11,105 @@ export function useTableEvents(
 	_props: TableProps,
 	sel: SelectionService,
 	ops: TableOpsService,
+	ctxMenuTarget: Ref<any>,
 	tableContainer: TemplateRef<HTMLElement>,
 ) {
-	onClickOutside(tableContainer, sel.deselect);
+	function defaultAction(e: KeyboardEvent) {
+		if (e.ctrlKey || e.metaKey || e.altKey) {
+			// Ignore other ctrl/meta key combinations
+			return;
+		}
+
+		if (/^[-a-zA-Z1-9\.,]$/.test(e.key)) {
+			ops.editSelected(e.key);
+		}
+
+		return;
+	}
+
+	onClickOutside(
+		tableContainer,
+		() => ctxMenuTarget.value || sel.deselect(),
+	);
 	useEventListener(document, 'copy', ops.copy);
 	useEventListener(document, 'paste', ops.paste);
 	useEventListener(document, 'keydown', e => {
 		if (!sel.hasSelection.value) return;
 
 		switch (e.key) {
-			// @ts-expect-error
+			default:
+				defaultAction(e);
+				return;
+
 			case 'a':
 				if (e.ctrlKey) {
 					sel.selectAll();
 					break;
 				}
 
-			default:
-				if (e.ctrlKey || e.metaKey || e.altKey) {
-					// Ignore other ctrl/meta key combinations
-					return;
+				defaultAction(e);
+				return;
+
+			case 'r':
+				if (e.altKey) {
+					ops.renameSelCol();
+					break;
 				}
 
-				if (/^[a-zA-Z1-9]$/.test(e.key)) {
-					ops.editSelected(e.key);
-				}
-
+				defaultAction(e);
 				return;
 
 			case 'ArrowLeft':
-				if (e.shiftKey) {
+				if (e.ctrlKey) {
+					ops.moveSelCol(-1);
+				} else if (e.shiftKey) {
 					sel.extendSelectionLeft();
 				} else if (e.altKey) {
-					ops.moveSelCol(-1);
+					sel.move(-1, 0, false);
 				} else {
-					sel.moveLeft();
+					sel.move(-1, 0);
 				}
 				break;
 
 			case 'ArrowRight':
-				if (e.shiftKey) {
+				if (e.ctrlKey) {
+					ops.moveSelCol(1);
+				} else if (e.shiftKey) {
 					sel.extendSelectionRight();
 				} else if (e.altKey) {
-					ops.moveSelCol(1);
+					sel.move(1, 0, false);
 				} else {
-					sel.moveRight();
+					sel.move(1, 0);
 				}
 				break;
 
 			case 'ArrowUp':
 				if (e.shiftKey) {
 					sel.extendSelectionUp();
+				} else if (e.altKey) {
+					sel.move(0, -1, false);
 				} else {
-					sel.moveUp();
+					sel.move(0, -1);
 				}
 				break;
 
 			case 'ArrowDown':
 				if (e.shiftKey) {
 					sel.extendSelectionDown();
+				} else if (e.altKey) {
+					sel.move(0, 1, false);
 				} else {
-					sel.moveDown();
+					sel.move(0, 1);
 				}
 				break;
 
 			case 'Delete':
 				if (e.ctrlKey) {
-					ops.deleteRows();
-				} else if (e.shiftKey) {
-					ops.deleteColumns();
+					if (e.shiftKey) {
+						ops.deleteColumns();
+					} else {
+						ops.deleteRows();
+					}
 				} else {
 					ops.resetCells();
 				}
@@ -93,9 +123,9 @@ export function useTableEvents(
 						ops.insertRow();
 					}
 				} else if (e.shiftKey) {
-					sel.moveUp();
+					sel.move(0, -1);
 				} else {
-					sel.moveDown();
+					sel.move(0, 1);
 				}
 				break;
 
@@ -105,9 +135,9 @@ export function useTableEvents(
 
 			case 'Tab':
 				if (e.shiftKey) {
-					sel.moveLeft();
+					sel.move(-1, 0);
 				} else {
-					sel.moveRight();
+					sel.move(1, 0);
 				}
 				break;
 		}

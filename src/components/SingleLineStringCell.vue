@@ -34,15 +34,3 @@ whenever(
 		:class="{ editing, readonly }"
 	/>
 </template>
-
-<style scoped>
-@reference '../../.storybook/style.css';
-
-.editing {
-	@apply shadow-md relative z-1 !border-b-4 !border-b-current;
-}
-
-.readonly {
-	@apply cursor-not-allowed;
-}
-</style>

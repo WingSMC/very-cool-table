@@ -3,18 +3,14 @@ import type {
 	StoryObj,
 } from '@storybook/vue3-vite';
 import Table from '../components/Table.vue';
+import { ColumnTypeEnum } from '../types';
 
-type Data = Record<string, string[]>;
-
-const meta = {
+const meta: Meta<typeof Table> = {
 	title: 'Table',
-	// @ts-ignore
 	component: Table,
 	tags: ['autodocs'],
-	subcomponents: {},
 	parameters: {
-		layout: 'fullscreen',
-
+		layout: 'padded',
 		docs: {
 			description: {
 				component:
@@ -31,38 +27,36 @@ const meta = {
 		// import { fn } from 'storybook/test';
 		// onClick: fn(),
 	},
-} satisfies Meta<typeof Table<Data>>;
+};
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
 const mockData = (() => {
 	const modelValue = {
-		Key: ['Row 1', 'Row 2', 'Row 3'],
-		'Longer Header': ['1', '2', '3'],
-		Asd: ['4', '5', '6'],
+		A: ['Row 1', 'Row 2', 'Row 3'],
+		B: ['1', '2', '3'],
+		numbers: [4, 5, 6],
 	};
 
 	return {
 		modelValue,
 		columns: Object.keys(modelValue),
 		columnColors: {
-			Asd: 'slateblue',
-			'Longer Header': 'cornflowerblue',
+			numbers: 'slateblue',
 		},
-		readonlyColumns: ['Asd'],
+		readonlyColumns: ['A'],
 		defaultColumnValues: {
-			Asd: '0',
-			'Longer Header': '0.5',
-			Key: '',
+			numbers: 0,
+		},
+		columnTypes: {
+			numbers: ColumnTypeEnum.Number,
 		},
 	};
 })();
 
 export const Base: Story = {
-	args: {
-		...mockData,
-	},
+	args: mockData,
 };
 
 export const Empty: Story = {

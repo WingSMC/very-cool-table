@@ -1,4 +1,3 @@
-import type { Mutable } from '@vueuse/core';
 import {
 	triggerRef,
 	type ModelRef,
@@ -32,25 +31,6 @@ export function useTableOps(
 		return key;
 	}
 
-	function pushColumn() {
-		if (!props.editable || !props.allowAddCols) {
-			return;
-		}
-
-		const colName = _generateUniqueColumnKey();
-		columns.value.push(colName);
-		(
-			table.value as Mutable<
-				Record<string, any[]>
-			>
-		)[colName] = Array.from(
-			{ length: sel.lastRowIndex.value + 1 },
-			() =>
-				props.defaultColumnValues[colName] ??
-				props.defaultColumnValue,
-		);
-	}
-
 	function insertColumn() {
 		if (!props.editable || !props.allowAddCols) {
 			return;
@@ -82,15 +62,19 @@ export function useTableOps(
 		const start = sel.selTopLeft.value!.col;
 		const end = sel.selBottomRight.value!.col;
 
-		const nCols = end - start + 1;
-		const keys = columns.value.splice(
-			start,
-			nCols,
+		const newColumns = columns.value.filter(
+			(c, i) => {
+				const shouldKeep =
+					i < start ||
+					end < i ||
+					props.readonlyColumns.includes(c);
+				if (!shouldKeep) {
+					delete table.value[c];
+				}
+				return shouldKeep;
+			},
 		);
-		triggerRef(columns);
-		for (const key of keys) {
-			delete table.value[key];
-		}
+		columns.value = newColumns;
 	}
 
 	function pushRow() {
@@ -110,12 +94,10 @@ export function useTableOps(
 		keyColumn.value.push(Symbol());
 	}
 
-	function insertRow() {
+	function insertRowAt(i: number) {
 		if (!props.editable || !props.allowAddRows) {
 			return;
 		}
-
-		const i = sel.getSelectedCell()!.end.row + 1;
 
 		for (const column of columns.value) {
 			if (!table.value[column]) continue;
@@ -132,6 +114,10 @@ export function useTableOps(
 
 		sel.selection.value!.start.row = i;
 		sel.selection.value!.end.row = i;
+	}
+	function insertRow() {
+		const i = sel.getSelection()!.end.row + 1;
+		insertRowAt(i);
 	}
 
 	function deleteRows() {
@@ -303,12 +289,12 @@ export function useTableOps(
 		for (let i = startIndex; i <= endIndex; i++) {
 			const row = selectedCols.map(key => {
 				const column = table.value[key];
-				if (!column) return '';
-
 				const type =
 					props.columnTypes[key] ??
 					props.defaultColumnType;
 				const value = column[i];
+
+				console.log(value);
 
 				switch (type) {
 					case ColumnTypeEnum.Number: {
@@ -324,6 +310,8 @@ export function useTableOps(
 						return value.toString();
 				}
 			});
+
+			console.log(JSON.stringify(row));
 
 			results.push(
 				row.filter(v => v.length).join('\t'),
@@ -372,6 +360,28 @@ export function useTableOps(
 
 		const columnName = columns.value[col];
 		if (!table.value[columnName]) return;
+
+		const colType =
+			props.columnTypes[columnName] ??
+			props.defaultColumnType;
+
+		switch (colType) {
+			case ColumnTypeEnum.Number: {
+				if (!/[-0-9\.,]/.test(value)) return;
+				const precision =
+					props.columnPrecisions[columnName] ??
+					props.defaultColumnPrecision;
+				const upscale = 10 ** precision;
+				value =
+					Math.round(value * upscale) / upscale;
+				break;
+			}
+			case ColumnTypeEnum.String:
+			default:
+				value = value.toString();
+				break;
+		}
+
 		table.value[columnName][row] = value;
 	}
 	function editSelected(
@@ -387,8 +397,6 @@ export function useTableOps(
 
 		const col = s.start.col;
 		const row = s.start.row;
-
-		console.log('editSelected');
 
 		event?.preventDefault();
 		_setCellValue(col, row, newValue);
@@ -430,16 +438,39 @@ export function useTableOps(
 		columns.value[newIndex] = temp;
 		return true;
 	}
+	function renameSelCol() {
+		const s = sel.constrainToCol();
+		if (!s) return;
+		const index = s.start.col;
+		renameCol(index);
+	}
+	function renameCol(index: number) {
+		if (!props.editable || !props.allowAddCols) {
+			return;
+		}
+
+		const oldName = columns.value[index];
+		if (props.readonlyColumns.includes(oldName)) {
+			return;
+		}
+
+		const newName = _generateUniqueColumnKey();
+		columns.value[index] = newName;
+		table.value[newName] = table.value[oldName];
+		delete table.value[oldName];
+	}
 
 	return {
 		pushRow,
 		insertRow,
+		insertRowAt,
 		deleteRows,
 
-		pushColumn,
 		insertColumn,
 		deleteColumns,
 		moveSelCol,
+		renameCol,
+		renameSelCol,
 
 		copy,
 		paste,

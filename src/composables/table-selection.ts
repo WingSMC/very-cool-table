@@ -99,17 +99,18 @@ export function useTableSelection(
 
 		e.preventDefault();
 
+		const cell = { col, row };
 		if (e.shiftKey && selection.value) {
 			selection.value = {
 				start: selection.value!.start,
-				end: { col, row },
+				end: cell,
 			};
 			return;
 		}
 		if (isEditedCell(col, row)) return;
 
-		const cell = { col, row };
 		selectionStartCell = cell;
+		setEditedCell(undefined);
 	}
 	function onMouseSelectionMove(
 		column: number,
@@ -124,6 +125,7 @@ export function useTableSelection(
 		}
 
 		_selectionMove(column, row);
+		setEditedCell(undefined);
 	}
 	function onMouseSelectionEnd(
 		column: number,
@@ -212,6 +214,13 @@ export function useTableSelection(
 	function getSelection() {
 		_selectEditedCell();
 		return selection.value;
+	}
+	function selectCell(col: number, row: number) {
+		setEditedCell(undefined);
+		selection.value = {
+			start: { col, row },
+			end: { col, row },
+		};
 	}
 	function singleSelection() {
 		const s = getSelection();
@@ -352,13 +361,10 @@ export function useTableSelection(
 			extendSelection(0, -1),
 		extendSelectionDown: () =>
 			extendSelection(0, 1),
+		selectCell,
 		singleSelection,
 		constrainToCol,
 		move,
-		moveLeft: () => move(-1, 0),
-		moveRight: () => move(1, 0),
-		moveUp: () => move(0, -1),
-		moveDown: () => move(0, 1),
 		deselect,
 
 		isColumnReadonly,
@@ -369,7 +375,7 @@ export function useTableSelection(
 		hasNoSelection,
 
 		setEditedCell,
-		getSelectedCell: getSelection,
+		getSelection,
 		selection,
 		selTopLeft,
 		selBottomRight,

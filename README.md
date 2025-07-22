@@ -5,7 +5,7 @@ You can play with the component and it's props here: [very-cool-table storybook]
 ## Installation
 
 ```sh
-npm i @wingsmc/very-cool-table @vueuse/core primevue vue
+npm i very-cool-table @vueuse/core primevue vue
 # optional
 npm i primeicons
 ```
@@ -42,7 +42,7 @@ Then you can use the `<Table>` component in your templates:
 	setup
 	lang="ts"
 >
-	import { Table } from '@wingsmc/very-cool-table';
+	import { Table } from 'very-cool-table';
 
 	const table = ref({
 		'Column 1': ['Row 1', 'Row 2', 'Row 3'],
@@ -67,6 +67,9 @@ Then you can use the `<Table>` component in your templates:
 ## Tips
 
 - You can provide `Proxy` objects for column mapper props (e.g. `columnTypes`, `defaultColumnValues`) so you can do more advanced name matching.
+- To implement custom cells refer to the various cell components like `NumberCell` in the source code and use the `columnToCellComponentTypeMap` prop and `overrideTypeToCellComponentTypeMap` table prop to add or override types mapped by the `columnTypes` prop.
+  - You can also `inject` the `OPERATIONS_SERVICE` and the `SELECTION_SERVICE` into your custom cell components to access the table operations and selection features.
+- Play with the component in the [storybook](https://wingsmc.github.io/very-cool-table/) to see all the props and features available.
 
 ## Development
 
