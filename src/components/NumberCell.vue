@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { whenever } from '@vueuse/core';
 import { computed, useTemplateRef } from 'vue';
+import {
+	calcUpscale,
+	roundToPrecision,
+} from '../util';
 
 const value = defineModel<number>({
 	required: true,
@@ -15,11 +19,10 @@ const {
 	editing: boolean;
 	precision: number;
 	readonly: boolean;
-	defaultValue: number;
+	defaultValue: unknown;
 }>();
 
-const inputRef =
-	useTemplateRef<HTMLInputElement>('input');
+const inputRef = useTemplateRef('input');
 
 whenever(
 	() => !readonly && editing,
@@ -34,17 +37,17 @@ whenever(
 const increment = computed(
 	() => 10 ** -precision,
 );
+const upscale = computed(() =>
+	calcUpscale(precision),
+);
 
 function onChange(event: Event) {
 	const target = event.target as HTMLInputElement;
-	const newValue = Number(target.value);
-	if (!isNaN(newValue)) {
-		value.value = parseFloat(
-			newValue.toFixed(precision),
-		);
-	} else {
-		value.value = defaultValue;
-	}
+	value.value = roundToPrecision(
+		target.value,
+		upscale.value,
+		Number(defaultValue),
+	);
 }
 </script>
 
@@ -62,6 +65,6 @@ function onChange(event: Event) {
 
 <style scoped>
 input {
-	text-align: right;
+	text-align: center;
 }
 </style>

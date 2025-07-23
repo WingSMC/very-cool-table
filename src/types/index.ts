@@ -80,9 +80,9 @@ export type InputProps = {
 		  };
 
 	/**
-	 * Extra menu items to add to the header context menu.
+	 * Extra menu items for the context menu.
 	 */
-	extraHeaderMenuItems?: MenuItem[];
+	extraCtxMenuItems?: MenuItem[];
 
 	/**
 	 * Column to cell component type map.

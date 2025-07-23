@@ -11,8 +11,7 @@ const { editing, readonly } = defineProps<{
 	readonly?: boolean;
 }>();
 
-const inputRef =
-	useTemplateRef<HTMLInputElement>('input');
+const inputRef = useTemplateRef('input');
 
 whenever(
 	() => !readonly && editing,
@@ -31,7 +30,7 @@ whenever(
 		v-model.lazy.trim="value"
 		:readonly="!editing || readonly"
 		:class="{ editing, readonly }"
-		@keydown.enter.stop
+		@keydown.enter.exact.stop
 	></textarea>
 </template>
 

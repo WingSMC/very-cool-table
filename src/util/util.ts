@@ -36,3 +36,26 @@ export function isEqual<T>(
 
 	return true;
 }
+
+export function calcUpscale(
+	precision: number,
+): number {
+	return 10 ** precision;
+}
+export function roundToPrecision(
+	value: string,
+	upscale: number,
+	defaultV: any,
+): number {
+	const v1 = parseFloat(value);
+	if (isNaN(v1)) {
+		return defaultV;
+	}
+
+	const v = Math.round(v1 * upscale) / upscale;
+	if (v === Infinity || v === -Infinity) {
+		return defaultV;
+	}
+
+	return v;
+}

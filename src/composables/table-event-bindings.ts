@@ -31,8 +31,12 @@ export function useTableEvents(
 		tableContainer,
 		() => ctxMenuTarget.value || sel.deselect(),
 	);
-	useEventListener(document, 'copy', ops.copy);
-	useEventListener(document, 'paste', ops.paste);
+	useEventListener(document, 'copy', e =>
+		ops.copy(e),
+	);
+	useEventListener(document, 'paste', e =>
+		ops.paste(e),
+	);
 	useEventListener(document, 'keydown', e => {
 		if (!sel.hasSelection.value) return;
 
@@ -46,7 +50,6 @@ export function useTableEvents(
 					sel.selectAll();
 					break;
 				}
-
 				defaultAction(e);
 				return;
 
@@ -55,7 +58,20 @@ export function useTableEvents(
 					ops.renameSelCol();
 					break;
 				}
+				defaultAction(e);
+				return;
 
+			case ' ':
+				if (e.ctrlKey) {
+					if (e.shiftKey) {
+						sel.selectColumn(
+							sel.selection.value!.end.col,
+						);
+					} else {
+						sel.selectRow();
+					}
+					break;
+				}
 				defaultAction(e);
 				return;
 
@@ -63,11 +79,11 @@ export function useTableEvents(
 				if (e.ctrlKey) {
 					ops.moveSelCol(-1);
 				} else if (e.shiftKey) {
-					sel.extendSelectionLeft();
+					sel.extendSelection(-1, 0);
 				} else if (e.altKey) {
-					sel.move(-1, 0, false);
+					sel.move(-1, 'col', false);
 				} else {
-					sel.move(-1, 0);
+					sel.move(-1, 'col');
 				}
 				break;
 
@@ -75,31 +91,31 @@ export function useTableEvents(
 				if (e.ctrlKey) {
 					ops.moveSelCol(1);
 				} else if (e.shiftKey) {
-					sel.extendSelectionRight();
+					sel.extendSelection(1, 0);
 				} else if (e.altKey) {
-					sel.move(1, 0, false);
+					sel.move(1, 'col', false);
 				} else {
-					sel.move(1, 0);
+					sel.move(1, 'col');
 				}
 				break;
 
 			case 'ArrowUp':
 				if (e.shiftKey) {
-					sel.extendSelectionUp();
+					sel.extendSelection(0, -1);
 				} else if (e.altKey) {
-					sel.move(0, -1, false);
+					sel.move(-1, 'row', false);
 				} else {
-					sel.move(0, -1);
+					sel.move(-1, 'row');
 				}
 				break;
 
 			case 'ArrowDown':
 				if (e.shiftKey) {
-					sel.extendSelectionDown();
+					sel.extendSelection(0, 1);
 				} else if (e.altKey) {
-					sel.move(0, 1, false);
+					sel.move(1, 'row', false);
 				} else {
-					sel.move(0, 1);
+					sel.move(1, 'row');
 				}
 				break;
 
@@ -123,9 +139,9 @@ export function useTableEvents(
 						ops.insertRow();
 					}
 				} else if (e.shiftKey) {
-					sel.move(0, -1);
+					sel.move(-1, 'row');
 				} else {
-					sel.move(0, 1);
+					sel.move(1, 'row');
 				}
 				break;
 
@@ -135,9 +151,9 @@ export function useTableEvents(
 
 			case 'Tab':
 				if (e.shiftKey) {
-					sel.move(-1, 0);
+					sel.move(-1, 'col');
 				} else {
-					sel.move(1, 0);
+					sel.move(1, 'col');
 				}
 				break;
 		}

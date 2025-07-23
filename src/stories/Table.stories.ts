@@ -19,7 +19,7 @@ const meta: Meta<typeof Table> = {
 		},
 		chromatic: {
 			delay: 1000,
-			viewports: [320, 768, 1024, 1440],
+			viewports: [768, 1024, 1440, 1920],
 		},
 	},
 	args: {
@@ -61,7 +61,7 @@ export const Base: Story = {
 
 export const Empty: Story = {
 	args: {
-		columns: [],
 		modelValue: {},
+		columns: [],
 	},
 };

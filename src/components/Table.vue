@@ -9,6 +9,7 @@ import {
 import { useTableEvents } from '../composables/table-event-bindings';
 import { useTableOps } from '../composables/table-ops';
 import { useTableSelection } from '../composables/table-selection';
+import { useContextMenu } from '../composables/use-context-menu';
 import {
 	ColumnTypeEnum,
 	type InputProps,
@@ -32,7 +33,7 @@ const table = defineModel<Record<string, any[]>>({
 /**
  * The columns to display in the table.
  * Should be an array of column names.
- * Their order is the order in which they will be displayed.
+ * Their order is the order in which the columns will be displayed.
  */
 const columns = defineModel<string[]>('columns', {
 	required: true,
@@ -54,47 +55,38 @@ const props = withDefaults(
 		defaultColumnValues: () => ({}),
 		columnTypes: () => ({}),
 		columnPrecisions: () => ({}),
-		extraHeaderMenuItems: () => [],
+		extraCtxMenuItems: () => [],
 		columnToCellComponentTypeMap: () => ({}),
-		overrideTypeToCellComponentTypeMap:
-			() => ({}),
+		overrideTypeToCellComponentTypeMap: () => ({
+			[ColumnTypeEnum.Number]: NumberCell,
+			[ColumnTypeEnum.String]:
+				MultilineStringCell,
+		}),
 	},
-);
-
-const typeToComponentMap = computed<
-	Record<number, any>
->(() => ({
-	[ColumnTypeEnum.Number]: NumberCell,
-	[ColumnTypeEnum.String]: MultilineStringCell,
-	...props.overrideTypeToCellComponentTypeMap,
-}));
-
-const firstColumnLength = computed(
-	() =>
-		table.value[columns.value[0]]?.length ?? 0,
 );
 
 const keyColumn = ref<symbol[]>(
 	Array.from(
-		{ length: firstColumnLength.value },
+		{
+			length: columns.value[0]
+				? table.value[columns.value[0]].length ??
+				  0
+				: 0,
+		},
 		() => Symbol(),
 	),
 );
 
-const ctxMenuTarget = ref<
-	| {
-			colName: string;
-			col: number;
-			row?: number;
-	  }
-	| undefined
->(undefined);
+const isEmpty = computed(
+	() => columns.value.length === 0,
+);
 
 const sel = useTableSelection(
 	columns,
 	props,
 	keyColumn,
 );
+
 const ops = useTableOps(
 	table,
 	columns,
@@ -102,6 +94,18 @@ const ops = useTableOps(
 	sel,
 	keyColumn,
 );
+
+const {
+	ctxMenuTarget,
+	ctxMenuItems,
+	ctxMenuShow,
+} = useContextMenu(
+	useTemplateRef('menu'),
+	props,
+	sel,
+	ops,
+);
+
 useTableEvents(
 	props,
 	sel,
@@ -111,180 +115,46 @@ useTableEvents(
 );
 
 defineExpose({
+	/**
+	 * The selection service used by the table.
+	 * You can manipulate the selection / editing with this service.
+	 *
+	 * This is also provided through the `SELECTION_SERVICE` injection key to child components.
+	 */
 	selection: sel,
+	/**
+	 * The operations service used by the table.
+	 * You can manipulate the table data with this service.
+	 *
+	 * This is also provided through the `OPERATIONS_SERVICE` injection key to child components.
+	 */
 	operations: ops,
 	/**
-	 * The keyColumn is internally used to uniquely identify the rows of the table.
+	 * **props**:
+	 * You can use this to access the props of the table including the defaulted values.
 	 *
+	 * **keyColumn**:
+	 * The key column used to uniquely identify the rows of the table.
 	 * This is the reason why the modification of the table outside the component is not recommended.
-	 * If you need to modify the table, use the provided operations instead or keep this in sync with the table data.
+	 * If you need to modify the table, use the provided/exposed `OPERATIONS_SERVICE / operations` instead or keep this in sync with the table data.
 	 *
-	 * This is a getter to the ref because the ref would be unwrapped by Vue.
+	 * **isEmpty**:
+	 * This computed is `true` if the table has no columns.
+	 *
+	 * **ctxMenuTarget**:
+	 * Ref of the selected table column/cell for the context menu.
+	 * Use this for your custom context menu items.
 	 */
-	getKeyColumn: () => keyColumn,
-	ctxMenuTarget,
-	props,
+	internal: {
+		props,
+		keyColumn,
+		isEmpty,
+		ctxMenuTarget,
+	},
 });
 
 provide(SELECTION_SERVICE, sel);
 provide(OPERATIONS_SERVICE, ops);
-
-const menu = useTemplateRef('menu');
-const ctxTargetReadonly = computed(() => {
-	return (
-		ctxMenuTarget.value &&
-		props.readonlyColumns.includes(
-			ctxMenuTarget.value.colName,
-		)
-	);
-});
-const ctxColEditItems = computed(() =>
-	props.allowAddCols
-		? [
-				{
-					label: 'Move Column Right',
-					icon: 'pi pi-arrow-right',
-					kbd: ['Alt', '→'],
-					command: () => {
-						const t = ctxMenuTarget.value!;
-						if (t.row) {
-							sel.selectCell(t.col, t.row);
-						} else {
-							sel.selectColumn(t.col);
-						}
-
-						ops.moveSelCol(1);
-					},
-				},
-				{
-					label: 'Move Column Left',
-					icon: 'pi pi-arrow-left',
-					kbd: ['Alt', '←'],
-					command: () => {
-						const t = ctxMenuTarget.value!;
-						if (t.row) {
-							sel.selectCell(t.col, t.row);
-						} else {
-							sel.selectColumn(t.col);
-						}
-
-						ops.moveSelCol(-1);
-					},
-				},
-				{
-					label: 'Insert Column',
-					icon: 'pi pi-plus',
-					kbd: ['Ctrl', 'Shift', 'Enter'],
-					command: () => {
-						const t = ctxMenuTarget.value!;
-						if (t.row) {
-							sel.selectCell(t.col, t.row);
-						} else {
-							sel.selectColumn(t.col);
-						}
-
-						ops.insertColumn();
-					},
-				},
-				{
-					label: 'Delete Column',
-					icon: 'pi pi-trash',
-					kbd: ['Ctrl', 'Shift', 'Delete'],
-					disabled: ctxTargetReadonly.value,
-					command: () => {
-						const t = ctxMenuTarget.value!;
-						if (t.row) {
-							sel.selectCell(t.col, t.row);
-						} else {
-							sel.selectColumn(t.col);
-						}
-
-						ops.deleteColumns();
-					},
-				},
-				{
-					label: 'Rename Column',
-					icon: 'pi pi-pencil',
-					kbd: ['Alt', 'R'],
-					disabled: ctxTargetReadonly.value,
-					command: () => {
-						const t = ctxMenuTarget.value!;
-						if (t.row) {
-							sel.selectCell(t.col, t.row);
-							ops.renameSelCol();
-						} else {
-							ops.renameCol(
-								ctxMenuTarget.value!.col,
-							);
-						}
-					},
-				},
-		  ]
-		: [],
-);
-const ctxRowEditItems = computed(() =>
-	props.allowAddRows
-		? [
-				{
-					label: 'Insert Row',
-					icon: 'pi pi-plus',
-					kbd: ['Ctrl', 'Enter'],
-					command: () => {
-						const t = ctxMenuTarget.value!;
-						if (t.row) {
-							ops.insertRowAt(t.row + 1);
-						} else {
-							ops.pushRow();
-						}
-					},
-				},
-				{
-					label: 'Delete Row',
-					icon: 'pi pi-trash',
-					kbd: ['Ctrl', 'Delete'],
-					command: () => {
-						const t = ctxMenuTarget.value!;
-						if (t.row) {
-							sel.selectCell(t.col, t.row);
-						} else {
-							sel.selectColumn(t.col);
-						}
-
-						ops.deleteRows();
-					},
-				},
-		  ]
-		: [],
-);
-const ctxEditableItems = computed(() =>
-	props.editable
-		? [
-				...ctxColEditItems.value,
-				...ctxRowEditItems.value,
-		  ]
-		: [],
-);
-const ctxMenuItems = computed(() => {
-	return [
-		...props.extraHeaderMenuItems,
-		...ctxEditableItems.value,
-	];
-});
-function ctxMenuShow(
-	event: MouseEvent,
-	colName: string,
-	col: number,
-	row?: number,
-) {
-	if (ctxMenuItems.value.length === 0) return;
-
-	ctxMenuTarget.value = {
-		colName,
-		col,
-		row,
-	};
-	menu.value?.show(event);
-}
 </script>
 
 <template>
@@ -366,26 +236,26 @@ function ctxMenuShow(
 			>
 				<Component
 					v-for="(_, row) in table[colName]"
+					v-model="table[colName][row]"
 					class="table-cell"
-					:is="
-						columnToCellComponentTypeMap[
-							colName
-						] ??
-						typeToComponentMap[
-							columnTypes[colName] ??
-								defaultColumnType
-						]
-					"
 					:class="{
 						even: row % 2 === 0,
 						selected: sel.isRowSelected(row),
 					}"
 					:key="keyColumn[row]"
+					:is="
+						columnToCellComponentTypeMap[
+							colName
+						] ??
+						overrideTypeToCellComponentTypeMap[
+							columnTypes[colName] ??
+								defaultColumnType
+						]
+					"
 					:editing="sel.isEditedCell(col, row)"
 					:readonly="
 						readonlyColumns.includes(colName)
 					"
-					:modelValue="table[colName][row]"
 					:defaultValue="
 						defaultColumnValues[colName] ??
 						defaultColumnValue
@@ -394,16 +264,23 @@ function ctxMenuShow(
 						columnPrecisions[colName] ??
 						defaultColumnPrecision
 					"
-					@update:modelValue="
-						table[colName][row] = $event
-					"
 					@mousedown="
-						sel.onSelectionStart(col, row, $event)
+						sel.onMouseSelectionStart(
+							col,
+							row,
+							$event,
+						)
 					"
 					@mousemove="
-						sel.onSelectionMove(col, row, $event)
+						sel.onMouseSelectionMove(
+							col,
+							row,
+							$event,
+						)
 					"
-					@mouseup="sel.onSelectionEnd(col, row)"
+					@mouseup="
+						sel.onMouseSelectionEnd(col, row)
+					"
 					@dblclick="
 						editable &&
 							sel.setEditedCell({ col, row })
@@ -411,7 +288,25 @@ function ctxMenuShow(
 					@contextmenu="
 						ctxMenuShow($event, colName, col, row)
 					"
+					@keydown.left.stop
+					@keydown.right.stop
+					@keydown.up.stop
+					@keydown.down.stop
+					@keydown.delete.stop
 				/>
+			</div>
+
+			<div
+				class="empty"
+				v-if="isEmpty && allowAddCols && editable"
+			>
+				<button @click="ops.insertColumnAt(0)">
+					<span class="pi pi-plus" />
+					<span
+						>The table is empty, add a
+						column?</span
+					>
+				</button>
 			</div>
 		</div>
 	</div>
@@ -460,7 +355,7 @@ function ctxMenuShow(
 		@apply z-10 h-full sticky top-0;
 	}
 	.table-body {
-		@apply relative z-0 overflow-hidden grid-rows-[repeat(3,max-content)];
+		@apply relative z-0 overflow-hidden;
 
 		.table-column {
 			@apply grid grid-rows-subgrid row-span-full;
@@ -548,5 +443,16 @@ input.table-cell {
 }
 .ctx-label {
 	@apply whitespace-nowrap;
+}
+
+.empty {
+	@apply text-black grid place-items-center p-4;
+	button {
+		@apply flex items-center gap-2 p-2
+			rounded-md
+			shadow-md
+			bg-gray-100 hover:bg-gray-200
+			cursor-pointer;
+	}
 }
 </style>

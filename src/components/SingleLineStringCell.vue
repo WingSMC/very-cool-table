@@ -11,8 +11,7 @@ const { editing, readonly } = defineProps<{
 	readonly?: boolean;
 }>();
 
-const inputRef =
-	useTemplateRef<HTMLInputElement>('input');
+const inputRef = useTemplateRef('input');
 
 whenever(
 	() => !readonly && editing,

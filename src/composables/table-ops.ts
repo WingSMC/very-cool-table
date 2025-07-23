@@ -7,6 +7,10 @@ import {
 	ColumnTypeEnum,
 	type TableProps,
 } from '../types';
+import {
+	calcUpscale,
+	roundToPrecision,
+} from '../util';
 import type { SelectionService } from './table-selection';
 
 export function useTableOps(
@@ -21,27 +25,22 @@ export function useTableOps(
 			prompt(
 				'Enter a unique column name or a new one will be generated:',
 			) ?? `col-0`;
+		key = key.trim();
 
 		let i = 1;
-		while (key in table.value) {
+		while (key === '' || key in table.value) {
 			key = `col-${i}`;
 			i++;
 		}
 
 		return key;
 	}
-
-	function insertColumn() {
+	function insertColumnAt(index: number) {
 		if (!props.editable || !props.allowAddCols) {
 			return;
 		}
 
-		const s = sel.constrainToCol();
-		if (!s) return;
-
-		const index = s.start.col + 1;
 		const colName = _generateUniqueColumnKey();
-
 		columns.value.splice(index, 0, colName);
 		triggerRef(columns);
 		table.value[colName] = Array.from(
@@ -51,13 +50,24 @@ export function useTableOps(
 				props.defaultColumnValue,
 		);
 	}
+	function insertColumn() {
+		if (!props.editable || !props.allowAddCols) {
+			return;
+		}
 
+		const s = sel.constrainToCol();
+		if (!s) return;
+
+		const index = s.end.col + 1;
+		insertColumnAt(index);
+		sel.constrainToCol(index);
+	}
 	function deleteColumns() {
 		if (!props.editable || !props.allowAddCols) {
 			return;
 		}
 
-		const s = sel.selection.value;
+		const s = sel.getSelection();
 		if (!s) return;
 		const start = sel.selTopLeft.value!.col;
 		const end = sel.selBottomRight.value!.col;
@@ -93,7 +103,6 @@ export function useTableOps(
 
 		keyColumn.value.push(Symbol());
 	}
-
 	function insertRowAt(i: number) {
 		if (!props.editable || !props.allowAddRows) {
 			return;
@@ -111,15 +120,12 @@ export function useTableOps(
 		keyColumn.value.splice(i, 0, Symbol());
 		triggerRef(table);
 		triggerRef(keyColumn);
-
-		sel.selection.value!.start.row = i;
-		sel.selection.value!.end.row = i;
+		sel.constrainToRow(i);
 	}
 	function insertRow() {
 		const i = sel.getSelection()!.end.row + 1;
 		insertRowAt(i);
 	}
-
 	function deleteRows() {
 		if (!props.editable || !props.allowAddRows) {
 			return;
@@ -139,28 +145,6 @@ export function useTableOps(
 
 		if (sel.lastRowIndex.value < end) {
 			sel.selectLastRow();
-		}
-	}
-
-	function _pasteIntoTableColumn(
-		columnKey: string,
-		index: number,
-		values: any[],
-	) {
-		if (!props.editable) return;
-
-		const overflow =
-			index +
-			values.length -
-			table.value[columnKey].length;
-
-		for (let i = 0; i < overflow; i++) {
-			pushRow();
-		}
-
-		for (let i = 0; i < values.length; i++) {
-			table.value[columnKey][index + i] =
-				values[i];
 		}
 	}
 
@@ -186,12 +170,8 @@ export function useTableOps(
 			col: pasteStartColumn,
 			row: pasteStartRow,
 		} = sel.selTopLeft.value!;
-		text = text.trim();
 
-		const textRows = text
-			.split(/\r?\n/)
-			.map(row => row.split('\t'));
-
+		const textRows = _parseTsv(text);
 		const selectedCols = columns.value.slice(
 			pasteStartColumn,
 			pasteStartColumn + textRows[0].length,
@@ -214,14 +194,17 @@ export function useTableOps(
 					const precision =
 						props.columnPrecisions[column] ??
 						props.defaultColumnPrecision;
-					const upscale = 10 ** precision;
-					const values = textRows.map(row => {
-						const cellText = row[columnIndex];
-						const v1 = parseFloat(cellText);
-						const v = isNaN(v1) ? 0 : v1;
+					const defaultV = Number(
+						props.defaultColumnValue[column] ??
+							props.defaultColumnValue,
+					);
+					const upscale = calcUpscale(precision);
 
-						return (
-							Math.round(v * upscale) / upscale
+					const values = textRows.map(row => {
+						return roundToPrecision(
+							row[columnIndex],
+							upscale,
+							defaultV,
 						);
 					});
 					_pasteIntoTableColumn(
@@ -247,7 +230,7 @@ export function useTableOps(
 		}
 
 		const { col, row } = sel.selTopLeft.value!;
-		sel.selection.value = {
+		sel.setSelection({
 			start: { col, row },
 			end: {
 				col:
@@ -256,7 +239,89 @@ export function useTableOps(
 					1,
 				row: pasteStartRow + textRows.length - 1,
 			},
-		};
+		});
+	}
+	function _pasteIntoTableColumn(
+		columnKey: string,
+		pasteAtRow: number,
+		values: any[],
+	) {
+		if (!props.editable) return;
+
+		if (props.allowAddRows) {
+			const overflow =
+				pasteAtRow +
+				values.length -
+				table.value[columnKey].length;
+			for (let i = 0; i < overflow; i++) {
+				pushRow();
+			}
+		}
+
+		const pasteUpperBound = props.allowAddRows
+			? values.length
+			: Math.min(
+					values.length,
+					table.value[columnKey].length -
+						pasteAtRow,
+			  );
+
+		for (let i = 0; i < pasteUpperBound; i++) {
+			table.value[columnKey][pasteAtRow + i] =
+				values[i];
+		}
+	}
+	function _parseTsv(text: string): string[][] {
+		const rows: string[][] = [];
+		let row: string[] = [];
+		let cell = '';
+		let inQuotes = false;
+		let i = 0;
+		if (!text.endsWith('\n')) {
+			text += '\n';
+		}
+
+		while (i < text.length) {
+			const char = text[i];
+
+			if (inQuotes) {
+				if (char === '"') {
+					if (text[i + 1] === '"') {
+						cell += '"';
+						++i;
+					} else {
+						inQuotes = false;
+					}
+				} else {
+					cell += char;
+				}
+			} else {
+				if (char === '"') {
+					inQuotes = true;
+				} else if (char === '\t') {
+					row.push(cell);
+					cell = '';
+				} else if (char === '\r') {
+					if (text[i + 1] === '\n') ++i;
+					row.push(cell);
+					rows.push(row);
+					row = [];
+					cell = '';
+				} else if (char === '\n') {
+					row.push(cell);
+					rows.push(row);
+					row = [];
+					cell = '';
+				} else {
+					cell += char;
+				}
+			}
+			++i;
+		}
+		// Add any remaining cell/row
+		if (cell !== '' || inQuotes) row.push(cell);
+		if (row.length) rows.push(row);
+		return rows;
 	}
 
 	function copy(e: ClipboardEvent) {
@@ -294,28 +359,28 @@ export function useTableOps(
 					props.defaultColumnType;
 				const value = column[i];
 
-				console.log(value);
-
 				switch (type) {
 					case ColumnTypeEnum.Number: {
-						const precision =
-							props.columnPrecisions[key] ??
-							props.defaultColumnPrecision;
-						return value.toFixed(
-							precision < 0 ? 0 : precision,
-						);
+						return value.toString();
 					}
 					case ColumnTypeEnum.String:
-					default:
-						return value.toString();
+					default: {
+						let strValue = value
+							.toString()
+							.trim();
+						if (strValue.includes('\n')) {
+							strValue = `"${strValue.replace(
+								'"',
+								'""',
+							)}"`;
+						}
+
+						return strValue;
+					}
 				}
 			});
 
-			console.log(JSON.stringify(row));
-
-			results.push(
-				row.filter(v => v.length).join('\t'),
-			);
+			results.push(row.join('\t'));
 		}
 
 		return results.join('\n');
@@ -395,8 +460,8 @@ export function useTableOps(
 		const s = sel.singleSelection();
 		if (!s) return;
 
-		const col = s.start.col;
-		const row = s.start.row;
+		const col = s.end.col;
+		const row = s.end.row;
 
 		event?.preventDefault();
 		_setCellValue(col, row, newValue);
@@ -414,12 +479,12 @@ export function useTableOps(
 		const s = sel.constrainToCol();
 		if (!s) return;
 
-		const oldIndex = s.start.col;
+		const oldIndex = s.end.col;
 		const newIndex = oldIndex + dir;
 
 		if (!_moveCol(oldIndex, newIndex)) return;
 
-		sel.move(dir, 0);
+		sel.move(dir, 'col');
 	}
 	function _moveCol(
 		oldIndex: number,
@@ -441,7 +506,7 @@ export function useTableOps(
 	function renameSelCol() {
 		const s = sel.constrainToCol();
 		if (!s) return;
-		const index = s.start.col;
+		const index = s.end.col;
 		renameCol(index);
 	}
 	function renameCol(index: number) {
@@ -467,6 +532,7 @@ export function useTableOps(
 		deleteRows,
 
 		insertColumn,
+		insertColumnAt,
 		deleteColumns,
 		moveSelCol,
 		renameCol,

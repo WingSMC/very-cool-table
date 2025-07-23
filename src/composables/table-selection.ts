@@ -172,13 +172,21 @@ export function useTableSelection(
 			end: edited,
 		};
 	}
-	function selectLastRow() {
+	function selectRow() {
+		const s = getSelection();
+		if (!s) return;
+
+		selectRowAt(s.end.row);
+	}
+	function selectRowAt(row: number) {
 		setEditedCell(undefined);
-		const row = lastRowIndex.value;
 		selection.value = {
-			start: { row, col: 0 },
-			end: { row, col: lastColIndex.value },
+			start: { col: 0, row },
+			end: { col: lastColIndex.value, row },
 		};
+	}
+	function selectLastRow() {
+		selectRowAt(lastRowIndex.value);
 	}
 	function selectAll() {
 		setEditedCell(undefined);
@@ -230,51 +238,83 @@ export function useTableSelection(
 		selection.value!.start = { ...s.end };
 		return selection.value;
 	}
-	function constrainToCol():
-		| TableSelection
-		| undefined {
-		const s = getSelection();
-		if (!s) return undefined;
+	function constrainToCol(
+		col?: number,
+	): TableSelection | undefined {
+		if (col === undefined) {
+			const s = getSelection();
+			if (!s) return undefined;
+			col = s.end.col;
+		} else {
+			setEditedCell(undefined);
+			selection.value!.end.col = col;
+		}
 
-		selection.value!.end.col = s.start.col;
+		selection.value!.start.col = col;
+		return selection.value;
+	}
+	function constrainToRow(row?: number) {
+		if (row === undefined) {
+			const s = getSelection();
+			if (!s) return undefined;
+			row = s.end.row;
+		} else {
+			setEditedCell(undefined);
+			selection.value!.end.row = row;
+		}
+
+		selection.value!.start.row = row;
 		return selection.value;
 	}
 	function move(
-		colDir: number,
-		rowDir: number,
+		dist: 1 | -1,
+		dir: 'col' | 'row',
 		single = true,
+		depth = 0,
 	) {
 		const s = single
 			? singleSelection()
 			: getSelection();
 		if (!s) return;
 
-		const scol = clamp(
-			s.start.col + colDir,
-			0,
-			lastColIndex.value,
-		);
-		const srow = clamp(
-			s.start.row + rowDir,
-			0,
-			lastRowIndex.value,
-		);
+		let sTarget = s.start[dir] + dist;
+		const max =
+			dir === 'col'
+				? lastColIndex.value
+				: lastRowIndex.value;
 
-		const ecol = clamp(
-			s.end.col + colDir,
-			0,
-			lastColIndex.value,
-		);
-		const erow = clamp(
-			s.end.row + rowDir,
-			0,
-			lastRowIndex.value,
-		);
+		if (single) {
+			if (sTarget < 0) {
+				sTarget = max;
+				if (depth > 1) return;
 
-		selection.value!.start.col = scol;
-		selection.value!.start.row = srow;
-		selection.value!.end.col = ecol;
-		selection.value!.end.row = erow;
+				move(
+					-1,
+					dir === 'col' ? 'row' : 'col',
+					true,
+					depth + 1,
+				);
+			} else if (max < sTarget) {
+				sTarget = 0;
+				if (depth > 1) return;
+
+				move(
+					1,
+					dir === 'col' ? 'row' : 'col',
+					true,
+					depth + 1,
+				);
+			}
+			selection.value!.start[dir] = sTarget;
+			selection.value!.end[dir] = sTarget;
+			return;
+		}
+
+		const start = clamp(sTarget, 0, max);
+		const end = clamp(s.end[dir] + dist, 0, max);
+
+		selection.value!.start[dir] = start;
+		selection.value!.end[dir] = end;
 	}
 
 	function deselect() {
@@ -294,6 +334,13 @@ export function useTableSelection(
 		}
 
 		editedCell.value = coord;
+	}
+
+	function setSelection(
+		sel: TableSelection | undefined,
+	) {
+		setEditedCell(undefined);
+		selection.value = sel;
 	}
 
 	/* IS... */
@@ -346,24 +393,30 @@ export function useTableSelection(
 		editedCell: editedCell as ComputedRef<
 			TableSelectionCoord | undefined
 		>,
-		onSelectionStart: onMouseSelectionStart,
-		onSelectionMove: onMouseSelectionMove,
-		onSelectionEnd: onMouseSelectionEnd,
+		selection: selection as ComputedRef<
+			TableSelection | undefined
+		>,
+		setEditedCell,
+		setSelection,
+		getSelection,
+		selTopLeft,
+		selBottomRight,
+		lastRowIndex,
+		lastColIndex,
+
+		onMouseSelectionStart,
+		onMouseSelectionMove,
+		onMouseSelectionEnd,
 		selectColumn,
+		selectRow,
+		selectRowAt,
 		selectLastRow,
 		selectAll,
 		extendSelection,
-		extendSelectionLeft: () =>
-			extendSelection(-1, 0),
-		extendSelectionRight: () =>
-			extendSelection(1, 0),
-		extendSelectionUp: () =>
-			extendSelection(0, -1),
-		extendSelectionDown: () =>
-			extendSelection(0, 1),
 		selectCell,
 		singleSelection,
 		constrainToCol,
+		constrainToRow,
 		move,
 		deselect,
 
@@ -373,13 +426,5 @@ export function useTableSelection(
 		isEditedCell,
 		hasSelection,
 		hasNoSelection,
-
-		setEditedCell,
-		getSelection,
-		selection,
-		selTopLeft,
-		selBottomRight,
-		lastRowIndex,
-		lastColIndex,
 	};
 }
