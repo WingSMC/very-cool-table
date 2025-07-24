@@ -121,6 +121,28 @@ export function useContextMenu(
 		props.allowAddRows
 			? [
 					{
+						label: 'Move Row Up',
+						icon: 'pi pi-arrow-up',
+						kbd: ['Ctrl', '↑'],
+						disabled: !ctxMenuTarget.value?.row,
+						command: () =>
+							ops.moveRowAt(
+								ctxMenuTarget.value!.row!,
+								-1,
+							),
+					},
+					{
+						label: 'Move Row Down',
+						icon: 'pi pi-arrow-down',
+						kbd: ['Ctrl', '↓'],
+						disabled: !ctxMenuTarget.value?.row,
+						command: () =>
+							ops.moveRowAt(
+								ctxMenuTarget.value!.row!,
+								1,
+							),
+					},
+					{
 						label: 'Insert Row',
 						icon: 'pi pi-plus',
 						kbd: ['Ctrl', 'Enter'],
@@ -140,12 +162,7 @@ export function useContextMenu(
 						disabled: !ctxMenuTarget.value?.row,
 						command: () => {
 							const t = ctxMenuTarget.value!;
-							if (t.row) {
-								sel.selectCell(t.col, t.row);
-							} else {
-								sel.selectColumn(t.col);
-							}
-
+							sel.selectCell(t.col, t.row!);
 							ops.deleteRows();
 						},
 					},
