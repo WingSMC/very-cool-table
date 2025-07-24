@@ -121,6 +121,15 @@ const columnColors = new Proxy(
 
 - To implement custom cells refer to the various cell components like `NumberCell` in the source code and use the `columnToCellComponentTypeMap` prop and `overrideTypeToCellComponentTypeMap` table prop to add or override types mapped by the `columnTypes` prop.
   - You can also `inject` the `OPERATIONS_SERVICE` and the `SELECTION_SERVICE` into your custom cell components to access the table operations and selection features.
+  - Cells recieve the following props:
+    - `colName`: the name of the column
+    - `col`: the column index in the columns array
+    - `row`: the row index
+    - `value`: the value of the cell (= `table[colName][row]`)
+    - `readonly`: whether the cell is readonly (from the `readonlyColumns` prop)
+    - `editing`: whether the cell is selected for editing
+    - `defaultValue`: the default value for the cell (from the `defaultColumnValues` and `defaultColumnValue` props)
+    - `precision`: the precision for number cells (from the `columnPrecisions` and `defaultColumnPrecision` props)
 - The table exposes the above services too so you can control the table programmatically from a parent component through a `useTemplateRef` or something similar.
 - Play with the component in the [storybook](https://wingsmc.github.io/very-cool-table/) to see all the props and features available.
 
