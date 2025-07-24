@@ -186,7 +186,7 @@ export function useTableSelection(
 		};
 	}
 	function selectLastRow() {
-		selectRowAt(lastRowIndex.value);
+		constrainToRow(lastRowIndex.value);
 	}
 	function selectAll() {
 		setEditedCell(undefined);

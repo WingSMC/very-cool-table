@@ -100,7 +100,9 @@ export function useTableEvents(
 				break;
 
 			case 'ArrowUp':
-				if (e.shiftKey) {
+				if (e.ctrlKey) {
+					ops.moveRow(-1);
+				} else if (e.shiftKey) {
 					sel.extendSelection(0, -1);
 				} else if (e.altKey) {
 					sel.move(-1, 'row', false);
@@ -110,7 +112,9 @@ export function useTableEvents(
 				break;
 
 			case 'ArrowDown':
-				if (e.shiftKey) {
+				if (e.ctrlKey) {
+					ops.moveRow(1);
+				} else if (e.shiftKey) {
 					sel.extendSelection(0, 1);
 				} else if (e.altKey) {
 					sel.move(1, 'row', false);

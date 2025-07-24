@@ -503,6 +503,42 @@ export function useTableOps(
 		columns.value[newIndex] = temp;
 		return true;
 	}
+	function moveRow(dir: -1 | 1) {
+		const s = sel.constrainToRow();
+		if (!s) return;
+		moveRowAt(s.end.row, dir);
+	}
+	function moveRowAt(index: number, dir: -1 | 1) {
+		if (!props.editable || !props.allowAddRows) {
+			return;
+		}
+
+		const targetIndex = index + dir;
+		if (
+			targetIndex < 0 ||
+			sel.lastRowIndex.value < targetIndex
+		) {
+			return;
+		}
+
+		const temp = keyColumn.value[index];
+		keyColumn.value[index] =
+			keyColumn.value[targetIndex];
+		keyColumn.value[targetIndex] = temp;
+
+		for (const column of columns.value) {
+			if (!table.value[column]) continue;
+
+			const tempValue =
+				table.value[column][index];
+			table.value[column][index] =
+				table.value[column][targetIndex];
+			table.value[column][targetIndex] =
+				tempValue;
+		}
+
+		sel.constrainToRow(targetIndex);
+	}
 	function renameSelCol() {
 		const s = sel.constrainToCol();
 		if (!s) return;
@@ -535,6 +571,8 @@ export function useTableOps(
 		insertColumnAt,
 		deleteColumns,
 		moveSelCol,
+		moveRow,
+		moveRowAt,
 		renameCol,
 		renameSelCol,
 
