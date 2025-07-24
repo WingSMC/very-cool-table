@@ -238,6 +238,9 @@ provide(OPERATIONS_SERVICE, ops);
 					v-for="(_, row) in table[colName]"
 					v-model="table[colName][row]"
 					class="table-cell"
+					:colName
+					:col
+					:row
 					:class="{
 						even: row % 2 === 0,
 						selected: sel.isRowSelected(row),
