@@ -89,7 +89,7 @@ Columns can also be selected by clicking the header.
 - <kbd>Shift</kbd> + (<kbd>↑</kbd> / <kbd>↓</kbd> / <kbd>←</kbd> / <kbd>→</kbd>): extend selection in the direction of the arrow
 - <kbd>Alt</kbd> + (<kbd>↑</kbd> / <kbd>↓</kbd> / <kbd>←</kbd> / <kbd>→</kbd>): move multi-selection
 - Move single selection, jumps to next/previous line/column when at the end of the current line/column:
-  - <kbd>Tab</kbd> / <kbd>→</kbd>:
+  - <kbd>Tab</kbd> / <kbd>→</kbd>
   - <kbd>Shift</kbd> + <kbd>Tab</kbd> / <kbd>←</kbd>
   - <kbd>Enter</kbd> / <kbd>↓</kbd>: Enter doesn't move when editing a multiline cell.
   - <kbd>Shift</kbd> + <kbd>Enter</kbd> / <kbd>↑</kbd>
