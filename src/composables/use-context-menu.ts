@@ -117,14 +117,16 @@ export function useContextMenu(
 			  ]
 			: [],
 	);
-	const ctxRowEditItems = computed(() =>
-		props.allowAddRows
+	const ctxRowEditItems = computed(() => {
+		const rowUndefined =
+			ctxMenuTarget.value?.row === undefined;
+		return props.allowAddRows
 			? [
 					{
 						label: 'Move Row Up',
 						icon: 'pi pi-arrow-up',
 						kbd: ['Ctrl', '↑'],
-						disabled: !ctxMenuTarget.value?.row,
+						disabled: rowUndefined,
 						command: () =>
 							ops.moveRowAt(
 								ctxMenuTarget.value!.row!,
@@ -135,7 +137,7 @@ export function useContextMenu(
 						label: 'Move Row Down',
 						icon: 'pi pi-arrow-down',
 						kbd: ['Ctrl', '↓'],
-						disabled: !ctxMenuTarget.value?.row,
+						disabled: rowUndefined,
 						command: () =>
 							ops.moveRowAt(
 								ctxMenuTarget.value!.row!,
@@ -159,7 +161,7 @@ export function useContextMenu(
 						label: 'Delete Row',
 						icon: 'pi pi-trash',
 						kbd: ['Ctrl', 'Delete'],
-						disabled: !ctxMenuTarget.value?.row,
+						disabled: rowUndefined,
 						command: () => {
 							const t = ctxMenuTarget.value!;
 							sel.selectCell(t.col, t.row!);
@@ -167,8 +169,8 @@ export function useContextMenu(
 						},
 					},
 			  ]
-			: [],
-	);
+			: [];
+	});
 	const ctxEditableItems = computed(() =>
 		props.editable
 			? [

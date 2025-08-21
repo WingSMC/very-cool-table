@@ -2,7 +2,7 @@
 	"name": "very-cool-table",
 	"private": false,
 	"license": "Apache-2.0",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"type": "module",
 	"description": "A very cool table component for Vue 3",
 	"keywords": [
