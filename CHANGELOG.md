@@ -1,5 +1,11 @@
 # very-cool-table
 
+## 1.1.2
+
+### Patch Changes
+
+- 687f6f5: more row ctx menu fixes
+
 ## 1.1.1
 
 ### Patch Changes

@@ -42,7 +42,7 @@ export function useContextMenu(
 						kbd: ['Ctrl', '→'],
 						command: () => {
 							const t = ctxMenuTarget.value!;
-							if (t.row) {
+							if (t.row !== undefined) {
 								sel.selectCell(t.col, t.row);
 							} else {
 								sel.selectColumn(t.col);
@@ -57,7 +57,7 @@ export function useContextMenu(
 						kbd: ['Ctrl', '←'],
 						command: () => {
 							const t = ctxMenuTarget.value!;
-							if (t.row) {
+							if (t.row !== undefined) {
 								sel.selectCell(t.col, t.row);
 							} else {
 								sel.selectColumn(t.col);
@@ -72,7 +72,7 @@ export function useContextMenu(
 						kbd: ['Ctrl', 'Shift', 'Enter'],
 						command: () => {
 							const t = ctxMenuTarget.value!;
-							if (t.row) {
+							if (t.row !== undefined) {
 								sel.selectCell(t.col, t.row);
 							} else {
 								sel.selectColumn(t.col);
@@ -88,7 +88,7 @@ export function useContextMenu(
 						disabled: ctxTargetReadonly.value,
 						command: () => {
 							const t = ctxMenuTarget.value!;
-							if (t.row) {
+							if (t.row !== undefined) {
 								sel.selectCell(t.col, t.row);
 							} else {
 								sel.selectColumn(t.col);
@@ -104,7 +104,7 @@ export function useContextMenu(
 						disabled: ctxTargetReadonly.value,
 						command: () => {
 							const t = ctxMenuTarget.value!;
-							if (t.row) {
+							if (t.row !== undefined) {
 								sel.selectCell(t.col, t.row);
 								ops.renameSelCol();
 							} else {
@@ -150,7 +150,7 @@ export function useContextMenu(
 						kbd: ['Ctrl', 'Enter'],
 						command: () => {
 							const t = ctxMenuTarget.value!;
-							if (t.row) {
+							if (t.row !== undefined) {
 								ops.insertRowAt(t.row + 1);
 							} else {
 								ops.pushRow();
@@ -180,6 +180,8 @@ export function useContextMenu(
 			: [],
 	);
 	const ctxMenuItems = computed(() => {
+		const rowUndefined =
+			ctxMenuTarget.value?.row === undefined;
 		return [
 			...props.extraCtxMenuItems,
 			...ctxEditableItems.value,
@@ -193,7 +195,7 @@ export function useContextMenu(
 				label: 'Select Row',
 				icon: 'pi pi-check-square',
 				kbd: ['Ctrl', 'Space'],
-				disabled: !ctxMenuTarget.value?.row,
+				disabled: rowUndefined,
 				command: () =>
 					sel.selectRowAt(
 						ctxMenuTarget.value!.row!,
