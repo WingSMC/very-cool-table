@@ -1,5 +1,11 @@
 # very-cool-table
 
+## 1.1.1
+
+### Patch Changes
+
+- 5643b32: first row actions disabled fix
+
 ## 1.1.0
 
 ### Minor Changes
