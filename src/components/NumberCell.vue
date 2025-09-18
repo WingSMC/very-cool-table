@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { whenever } from '@vueuse/core';
 import { computed, useTemplateRef } from 'vue';
+import type { CellProps } from '../types';
 import {
 	calcUpscale,
 	roundToPrecision,
@@ -15,12 +16,7 @@ const {
 	readonly,
 	precision,
 	defaultValue,
-} = defineProps<{
-	editing: boolean;
-	precision: number;
-	readonly: boolean;
-	defaultValue: unknown;
-}>();
+} = defineProps<CellProps<unknown>>();
 
 const inputRef = useTemplateRef('input');
 
@@ -66,5 +62,11 @@ function onChange(event: Event) {
 <style scoped>
 input {
 	text-align: center;
+	appearance: textfield;
+	&::-webkit-outer-spin-button,
+	&::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
 }
 </style>
