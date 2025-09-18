@@ -20,27 +20,43 @@ export function useTableOps(
 	sel: SelectionService,
 	keyColumn: Ref<symbol[]>,
 ) {
-	function _generateUniqueColumnKey(): string {
-		let key =
-			prompt(
-				'Enter a unique column name or a new one will be generated:',
-			) ?? `col-0`;
-		key = key.trim();
-
-		let i = 1;
-		while (key === '' || key in table.value) {
+	function _generateUniqueColumnName(): string {
+		let key: string;
+		let i = 0;
+		do {
 			key = `col-${i}`;
 			i++;
-		}
+		} while (key in table.value);
 
 		return key;
 	}
-	function insertColumnAt(index: number) {
+
+	function _getNewUniqueColumnName(
+		oldName?: string,
+	): string | null | undefined {
+		return prompt(
+			'Enter a unique column name or a new one will be generated:',
+			oldName ?? _generateUniqueColumnName(),
+		)?.trim();
+	}
+
+	/**
+	 * If editable prompts the user for a new column name or generates one.
+	 * Inserts a new column at the given index.
+	 *
+	 * @param index - where to insert the new column
+	 * @returns success
+	 */
+	function insertColumnAt(
+		index: number,
+	): boolean {
 		if (!props.editable || !props.allowAddCols) {
-			return;
+			return false;
 		}
 
-		const colName = _generateUniqueColumnKey();
+		const colName = _getNewUniqueColumnName();
+		if (!colName) return false;
+
 		columns.value.splice(index, 0, colName);
 		triggerRef(columns);
 		table.value[colName] = Array.from(
@@ -49,6 +65,8 @@ export function useTableOps(
 				props.defaultColumnValues[colName] ??
 				props.defaultColumnValue,
 		);
+
+		return true;
 	}
 	function insertColumn() {
 		if (!props.editable || !props.allowAddCols) {
@@ -59,7 +77,7 @@ export function useTableOps(
 		if (!s) return;
 
 		const index = s.end.col + 1;
-		insertColumnAt(index);
+		if (!insertColumnAt(index)) return;
 		sel.constrainToCol(index);
 	}
 	function deleteColumns() {
@@ -352,33 +370,36 @@ export function useTableOps(
 		);
 
 		for (let i = startIndex; i <= endIndex; i++) {
-			const row = selectedCols.map(key => {
-				const column = table.value[key];
-				const type =
-					props.columnTypes[key] ??
-					props.defaultColumnType;
-				const value = column[i];
+			const row = selectedCols
+				.map(key => {
+					const column = table.value[key];
+					if (!column) return undefined;
+					const type =
+						props.columnTypes[key] ??
+						props.defaultColumnType;
+					const value = column[i];
 
-				switch (type) {
-					case ColumnTypeEnum.Number: {
-						return value.toString();
-					}
-					case ColumnTypeEnum.String:
-					default: {
-						let strValue = value
-							.toString()
-							.trim();
-						if (strValue.includes('\n')) {
-							strValue = `"${strValue.replace(
-								'"',
-								'""',
-							)}"`;
+					switch (type) {
+						case ColumnTypeEnum.Number: {
+							return value.toString();
 						}
+						case ColumnTypeEnum.String:
+						default: {
+							let strValue = value
+								.toString()
+								.trim();
+							if (strValue.includes('\n')) {
+								strValue = `"${strValue.replace(
+									'"',
+									'""',
+								)}"`;
+							}
 
-						return strValue;
+							return strValue;
+						}
 					}
-				}
-			});
+				})
+				.filter(v => v !== undefined);
 
 			results.push(row.join('\t'));
 		}
@@ -555,7 +576,10 @@ export function useTableOps(
 			return;
 		}
 
-		const newName = _generateUniqueColumnKey();
+		const newName =
+			_getNewUniqueColumnName(oldName);
+		if (!newName || newName === oldName) return;
+
 		columns.value[index] = newName;
 		table.value[newName] = table.value[oldName];
 		delete table.value[oldName];

@@ -1,5 +1,11 @@
 # very-cool-table
 
+## 1.2.0
+
+### Minor Changes
+
+- 75bf275: better column naming, better internal html structure, provided keyColumn
+
 ## 1.1.2
 
 ### Patch Changes

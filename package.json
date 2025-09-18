@@ -2,7 +2,7 @@
 	"name": "very-cool-table",
 	"private": false,
 	"license": "Apache-2.0",
-	"version": "1.1.2",
+	"version": "1.2.0",
 	"type": "module",
 	"description": "A very cool table component for Vue 3",
 	"keywords": [
@@ -38,7 +38,7 @@
 		"registry": "https://registry.npmjs.org/"
 	},
 	"scripts": {
-		"dev": "vite",
+		"dev": "pnpm run storybook",
 		"build": "vue-tsc -b && vite build",
 		"preview": "vite preview",
 		"storybook": "storybook dev -p 6006",
