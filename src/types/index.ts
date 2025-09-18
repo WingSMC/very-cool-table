@@ -85,10 +85,13 @@ export type InputProps = {
 	extraCtxMenuItems?: MenuItem[];
 
 	/**
-	 * Column to cell component type map.
-	 * This is used to map column types to specific cell components.
-	 * Defaults to the internal `typeToCellComponentTypeMap` that is
-	 * computed from `overrideTypeToCellComponentTypeMap`.
+	 * This is used to map column names to specific cell components.
+	 * Defaults to `overrideTypeToCellComponentTypeMap` values.
+	 *
+	 * **Example use**: You have a number type column named "Status",
+	 * but you want a colored badge cell component instead of a number cell component.
+	 *
+	 * This has higher priority than `overrideTypeToCellComponentTypeMap` **obviously**.
 	 */
 	columnToCellComponentTypeMap?: Record<
 		string,
@@ -98,6 +101,9 @@ export type InputProps = {
 	/**
 	 * Override the default cell component types for specific column types.
 	 * You can use this to use custom cell components for specific column types.
+	 *
+	 * **Example use**: if you want all number columns to
+	 * be edited with a custom component like a slider.
 	 */
 	overrideTypeToCellComponentTypeMap?: Record<
 		string,
@@ -111,3 +117,15 @@ export type InputProps = {
 };
 
 export type TableProps = Required<InputProps>;
+
+export type CellProps<T> = {
+	editing: boolean;
+	readonly?: boolean;
+	keySymbol: symbol;
+	colName: string;
+	col: number;
+	row: number;
+	defaultValue: T;
+	precision: number;
+	modelValue: T;
+};

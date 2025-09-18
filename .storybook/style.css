@@ -3,10 +3,11 @@
 
 @theme {
 	--color-vct-cell-inherit: black;
-	--spacing-vct-cell-height: 40px;
-	--text-shadow-vct: 0 0 2rem
-		var(--color-vct-cell-inherit);
-
 	--inset-shadow-vct: inset 0px 0px 3rem 0rem
 		var(--tw-inset-shadow-color);
+
+	--spacing-vct-cell-height: 40px;
+	--spacing-vct-col-min: 40px;
+	--spacing-vct-col-max: unset;
+	--spacing-vct-col: max-content;
 }

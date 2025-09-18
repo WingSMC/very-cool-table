@@ -120,7 +120,7 @@ const columnColors = new Proxy(
 ```
 
 - To implement custom cells refer to the various cell components like `NumberCell` in the source code and use the `columnToCellComponentTypeMap` prop and `overrideTypeToCellComponentTypeMap` table prop to add or override types mapped by the `columnTypes` prop.
-  - You can also `inject` the `OPERATIONS_SERVICE` and the `SELECTION_SERVICE` into your custom cell components to access the table operations and selection features.
+  - You can also `inject` the `OPERATIONS_SERVICE`, `KEY_COLUMN` and the `SELECTION_SERVICE` into your custom cell components to access the table operations and selection features.
   - Cells recieve the following props:
     - `colName`: the name of the column
     - `col`: the column index in the columns array

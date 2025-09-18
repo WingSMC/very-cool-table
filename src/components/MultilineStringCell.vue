@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { whenever } from '@vueuse/core';
 import { useTemplateRef } from 'vue';
+import type { CellProps } from '../types';
 
 const value = defineModel<string>({
 	required: true,
 });
 
-const { editing, readonly } = defineProps<{
-	editing: boolean;
-	readonly?: boolean;
-}>();
+const { editing, readonly } =
+	defineProps<CellProps<unknown>>();
 
 const inputRef = useTemplateRef('input');
 

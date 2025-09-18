@@ -3,6 +3,7 @@ import { ContextMenu } from 'primevue';
 import {
 	computed,
 	provide,
+	reactive,
 	ref,
 	useTemplateRef,
 } from 'vue';
@@ -15,8 +16,10 @@ import {
 	type InputProps,
 } from '../types';
 import {
+	KEY_COLUMN,
 	OPERATIONS_SERVICE,
 	SELECTION_SERVICE,
+	sortByArrayOrder,
 } from '../util';
 import MultilineStringCell from './MultilineStringCell.vue';
 import NumberCell from './NumberCell.vue';
@@ -38,6 +41,12 @@ const table = defineModel<Record<string, any[]>>({
 const columns = defineModel<string[]>('columns', {
 	required: true,
 });
+const hiddenColumns = reactive(new Set<string>());
+const displayedColumns = computed(() =>
+	columns.value
+		.filter(col => !hiddenColumns.has(col))
+		.sort(sortByArrayOrder(columns.value)),
+);
 
 const props = withDefaults(
 	defineProps<InputProps>(),
@@ -65,15 +74,18 @@ const props = withDefaults(
 	},
 );
 
+function findLen() {
+	const min = Math.min(
+		...columns.value
+			.map(c => table.value[c]?.length)
+			.filter(l => l > 0),
+	);
+	return min === Infinity ? 0 : min;
+}
+
 const keyColumn = ref<symbol[]>(
-	Array.from(
-		{
-			length: columns.value[0]
-				? table.value[columns.value[0]].length ??
-				  0
-				: 0,
-		},
-		() => Symbol(),
+	Array.from({ length: findLen() }, () =>
+		Symbol(),
 	),
 );
 
@@ -134,9 +146,11 @@ defineExpose({
 	 * You can use this to access the props of the table including the defaulted values.
 	 *
 	 * **keyColumn**:
-	 * The key column used to uniquely identify the rows of the table.
+	 * The `keyColumn` used to uniquely identify the rows of the table. It is just a simple Ref<symbol[]>.
 	 * This is the reason why the modification of the table outside the component is not recommended.
-	 * If you need to modify the table, use the provided/exposed `OPERATIONS_SERVICE / operations` instead or keep this in sync with the table data.
+	 * This is provided with the `KEY_COLUMN` injection key to child components.
+	 * If you need to modify the table, use the provided/exposed `OPERATIONS_SERVICE / operations` instead
+	 * *OR if you really want to touch it yourself when you add/remove a row make sure to also add/remove the key symbol at the right index in this array.*
 	 *
 	 * **isEmpty**:
 	 * This computed is `true` if the table has no columns.
@@ -155,11 +169,12 @@ defineExpose({
 
 provide(SELECTION_SERVICE, sel);
 provide(OPERATIONS_SERVICE, ops);
+provide(KEY_COLUMN, keyColumn);
 </script>
 
 <template>
 	<div
-		class="table"
+		class="vct"
 		:class="{ editable }"
 		ref="tableContainer"
 	>
@@ -192,37 +207,18 @@ provide(OPERATIONS_SERVICE, ops);
 			</template>
 		</ContextMenu>
 
-		<div class="table-header">
-			<div
-				v-for="(colName, col) in columns"
-				class="table-header-cell table-cell"
-				aria-haspopup="true"
-				:key="colName"
-				:class="{
-					even: col % 2 === 0,
-					vertical: verticalHeader,
-				}"
-				:style="{
-					'--color-vct-cell-inherit':
-						columnColors[colName] ??
-						defaultColumnColor,
-				}"
-				@click="sel.selectColumn(col)"
-				@contextmenu="
-					ctxMenuShow($event, colName, col)
-				"
-			>
-				<span>{{ colName }}</span>
-			</div>
-		</div>
-
 		<div
-			class="table-body"
-			:style="`grid-template-rows: repeat(${keyColumn.length},max-content)`"
+			class="vct-body"
+			:style="{
+				'grid-template-rows': `repeat(${
+					keyColumn.length + 1
+				},max-content)`,
+				'grid-template-columns': `repeat(${displayedColumns.length},max-content)`,
+			}"
 		>
 			<div
-				class="table-column"
-				v-for="(colName, col) in columns"
+				class="vct-column"
+				v-for="(colName, col) in displayedColumns"
 				:key="colName"
 				:class="{
 					selected: sel.isColumnSelected(col),
@@ -234,10 +230,28 @@ provide(OPERATIONS_SERVICE, ops);
 						defaultColumnColor,
 				}"
 			>
+				<div
+					class="vct-header-cell"
+					aria-haspopup="true"
+					:key="colName"
+					:class="{
+						even: col % 2 === 0,
+						vertical: verticalHeader,
+					}"
+					@click="sel.selectColumn(col)"
+					@contextmenu="
+						ctxMenuShow($event, colName, col)
+					"
+				>
+					<span>{{ colName }}</span>
+				</div>
+
 				<Component
-					v-for="(_, row) in table[colName]"
-					v-model="table[colName][row]"
-					class="table-cell"
+					class="vct-cell"
+					v-for="(val, row) in table[colName] ??
+					keyColumn"
+					:key="keyColumn[row]"
+					:keySymbol="keyColumn[row]"
 					:colName
 					:col
 					:row
@@ -245,7 +259,6 @@ provide(OPERATIONS_SERVICE, ops);
 						even: row % 2 === 0,
 						selected: sel.isRowSelected(row),
 					}"
-					:key="keyColumn[row]"
 					:is="
 						columnToCellComponentTypeMap[
 							colName
@@ -266,6 +279,10 @@ provide(OPERATIONS_SERVICE, ops);
 					:precision="
 						columnPrecisions[colName] ??
 						defaultColumnPrecision
+					"
+					:modelValue="val"
+					@update:modelValue="
+						table[colName][row] = $event!
 					"
 					@mousedown="
 						sel.onMouseSelectionStart(
@@ -317,13 +334,16 @@ provide(OPERATIONS_SERVICE, ops);
 
 <style>
 @reference '../../.storybook/style.css';
+
 :root {
 	--color-vct-cell-inherit: black;
-	--spacing-vct-cell-height: 40px;
-	--text-shadow-vct: 0 0 2rem
-		var(--color-vct-cell-inherit);
 	--inset-shadow-vct: inset 0px 0px 3rem 0rem
 		var(--tw-inset-shadow-color);
+
+	--spacing-vct-cell-height: 40px;
+	--spacing-vct-col-min: 40px;
+	--spacing-vct-col-max: unset;
+	--spacing-vct-col: max-content;
 }
 
 .vct-context-menu {
@@ -347,48 +367,71 @@ provide(OPERATIONS_SERVICE, ops);
 <style scoped>
 @reference '../../.storybook/style.css';
 
-.table {
-	@apply shadow-lg rounded-lg relative z-1 w-full select-none;
+.vct {
+	@apply shadow-lg rounded-lg relative z-1 w-full overflow-x-auto select-none;
 
-	.table-header,
-	.table-body {
-		@apply grid grid-cols-[repeat(auto-fit,minmax(0,1fr))];
-	}
-	.table-header {
-		@apply z-10 h-full sticky top-0;
-	}
-	.table-body {
-		@apply relative z-0 overflow-hidden;
+	.vct-body {
+		@apply grid relative z-0;
 
-		.table-column {
+		grid-auto-columns: auto;
+		grid-auto-flow: column;
+
+		.vct-column {
 			@apply grid grid-rows-subgrid row-span-full;
 
-			&:first-child {
-				.table-cell {
-					@apply last:rounded-bl-lg;
-				}
+			&:first-child > * {
+				@apply first:rounded-tl-lg last:rounded-bl-lg;
 			}
-			&:last-child {
-				.table-cell {
-					@apply last:rounded-br-lg;
-				}
+			&:last-child > * {
+				@apply first:rounded-tr-lg last:rounded-br-lg;
 			}
+		}
+	}
+
+	&.editable {
+		.vct-cell.readonly {
+			@apply cursor-not-allowed;
 		}
 	}
 }
 
-.table-cell {
-	@apply min-h-vct-cell-height
-		p-1
+.vct-header-cell {
+	@apply p-4
+		h-full
+		leading-normal
+		border-b-4 border-b-vct-cell-inherit
+
+		flex gap-4 justify-center items-center
+
+		z-10 sticky top-0;
+
+	&.vertical {
+		@apply [writing-mode:vertical-lr] justify-end;
+	}
+
+	span {
+		@apply break-all;
+	}
+}
+
+.vct-cell,
+.vct-header-cell {
+	@apply w-vct-col min-w-vct-col-min max-w-vct-col-max;
+	@apply outline-none
+		w-full
+		bg-clip-border
+		bg-white
+		text-vct-cell-inherit
+		cursor-default 
+		[.even,.even>*]:bg-gray-50
+		[.even>.even]:bg-gray-100;
+}
+
+.vct-cell {
+	@apply p-1
+		min-h-vct-cell-height
 		border
 		border-transparent
-		bg-clip-border
-
-		text-vct-cell-inherit
-
-		bg-white
-		[.even,.even>*]:bg-gray-50
-		[.even>.even]:bg-gray-100
 
 		[.selected>.selected]:border-blue-500
 		[.selected+.selected>.selected]:border-l-transparent
@@ -396,42 +439,10 @@ provide(OPERATIONS_SERVICE, ops);
 		[.selected+.selected]:!border-t-transparent
 		has-[+.selected]:!border-b-transparent
 		[.selected>.selected]:inset-shadow-vct
-		[.selected>.selected]:inset-shadow-blue-300/20
-		
-		w-full outline-none shadow-black/30
-		cursor-default;
+		[.selected>.selected]:inset-shadow-blue-300/20;
 
 	&.editing {
 		@apply shadow-md relative z-1 !border-b-3 !border-b-current;
-	}
-}
-
-.table.editable {
-	.table-cell.readonly {
-		@apply cursor-not-allowed;
-	}
-}
-
-input.table-cell {
-	appearance: textfield;
-	&::-webkit-outer-spin-button,
-	&::-webkit-inner-spin-button {
-		-webkit-appearance: none;
-		margin: 0;
-	}
-}
-
-.table-header-cell {
-	@apply p-4
-		h-full
-		leading-normal
-		border-b-4 border-b-vct-cell-inherit
-		text-shadow-vct
-		first:rounded-tl-lg last:rounded-tr-lg
-		flex gap-4 justify-center items-center;
-
-	&.vertical {
-		@apply [writing-mode:vertical-lr] justify-end;
 	}
 }
 

@@ -59,3 +59,8 @@ export function roundToPrecision(
 
 	return v;
 }
+
+export function sortByArrayOrder<T>(arr: T[]) {
+	return (a: T, b: T) =>
+		arr.indexOf(a) - arr.indexOf(b);
+}
