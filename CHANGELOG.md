@@ -1,5 +1,11 @@
 # very-cool-table
 
+## 1.3.0
+
+### Minor Changes
+
+- 1e06dbe: log bugfix, css variables for table size
+
 ## 1.2.0
 
 ### Minor Changes
