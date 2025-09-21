@@ -2,6 +2,7 @@ import {
 	computed,
 	ref,
 	watch,
+	watchEffect,
 	type ComputedRef,
 	type ModelRef,
 	type Ref,
@@ -51,6 +52,57 @@ export function useTableSelection(
 	const selection = ref<
 		TableSelection | undefined
 	>(undefined);
+
+	watchEffect(() => {
+		const lastRow = lastRowIndex.value;
+		const lastCol = lastColIndex.value;
+
+		// console.log(
+		// 'constrain selection',
+		// JSON.stringify(
+		// {
+		// lastRow,
+		// lastCol,
+		// selection: selection.value,
+		// },
+		// null,
+		// 2,
+		// ),
+		// );
+
+		const sel = selection.value;
+		if (!sel) return;
+
+		const startCol = clamp(
+			sel.start.col,
+			0,
+			lastCol,
+		);
+		const startRow = clamp(
+			sel.start.row,
+			0,
+			lastRow,
+		);
+		const endCol = clamp(sel.end.col, 0, lastCol);
+		const endRow = clamp(sel.end.row, 0, lastRow);
+
+		if (startCol !== sel.start.col) {
+			sel.start.col = startCol;
+		}
+		if (startRow !== sel.start.row) {
+			sel.start.row = startRow;
+		}
+		if (endCol !== sel.end.col) {
+			sel.end.col = endCol;
+		}
+		if (endRow !== sel.end.row) {
+			sel.end.row = endRow;
+		}
+		// console.log(
+		// 'constrained',
+		// JSON.stringify(selection.value, null, 2),
+		// );
+	});
 
 	const selTopLeft = computed(() => {
 		const sel = selection.value;

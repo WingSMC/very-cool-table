@@ -33,11 +33,23 @@ export function useTableOps(
 
 	function _getNewUniqueColumnName(
 		oldName?: string,
-	): string | null | undefined {
-		return prompt(
+	): string | undefined {
+		const userInput = prompt(
 			'Enter a unique column name or a new one will be generated:',
 			oldName ?? _generateUniqueColumnName(),
 		)?.trim();
+
+		if (
+			userInput === '' ||
+			userInput === null ||
+			userInput === undefined
+		) {
+			return undefined;
+		}
+
+		if (userInput in table.value) {
+			return _generateUniqueColumnName();
+		}
 	}
 
 	/**
