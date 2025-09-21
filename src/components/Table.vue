@@ -176,6 +176,10 @@ provide(KEY_COLUMN, keyColumn);
 	<div
 		class="vct"
 		:class="{ editable }"
+		:style="{
+			'--vct-n-rows': keyColumn.length + 1,
+			'--vct-n-cols': displayedColumns.length,
+		}"
 		ref="tableContainer"
 	>
 		<ContextMenu
@@ -207,15 +211,7 @@ provide(KEY_COLUMN, keyColumn);
 			</template>
 		</ContextMenu>
 
-		<div
-			class="vct-body"
-			:style="{
-				'grid-template-rows': `repeat(${
-					keyColumn.length + 1
-				},max-content)`,
-				'grid-template-columns': `repeat(${displayedColumns.length},max-content)`,
-			}"
-		>
+		<div class="vct-body">
 			<div
 				class="vct-column"
 				v-for="(colName, col) in displayedColumns"
@@ -234,10 +230,7 @@ provide(KEY_COLUMN, keyColumn);
 					class="vct-header-cell"
 					aria-haspopup="true"
 					:key="colName"
-					:class="{
-						even: col % 2 === 0,
-						vertical: verticalHeader,
-					}"
+					:class="{ vertical: verticalHeader }"
 					@click="sel.selectColumn(col)"
 					@contextmenu="
 						ctxMenuShow($event, colName, col)
@@ -335,6 +328,18 @@ provide(KEY_COLUMN, keyColumn);
 <style>
 @reference '../../.storybook/style.css';
 
+@property --vct-n-rows {
+	syntax: '<integer>';
+	initial-value: 0;
+	inherits: true;
+}
+
+@property --vct-n-cols {
+	syntax: '<integer>';
+	initial-value: 0;
+	inherits: true;
+}
+
 :root {
 	--color-vct-cell-inherit: black;
 	--inset-shadow-vct: inset 0px 0px 3rem 0rem
@@ -371,10 +376,16 @@ provide(KEY_COLUMN, keyColumn);
 	@apply shadow-lg rounded-lg relative z-1 w-full overflow-x-auto select-none;
 
 	.vct-body {
-		@apply grid relative z-0;
+		@apply grid relative z-0 @container;
 
-		grid-auto-columns: auto;
-		grid-auto-flow: column;
+		grid-template-rows: repeat(
+			var(--vct-n-rows),
+			max-content
+		);
+		grid-template-columns: repeat(
+			var(--vct-n-cols),
+			max-content
+		);
 
 		.vct-column {
 			@apply grid grid-rows-subgrid row-span-full;
