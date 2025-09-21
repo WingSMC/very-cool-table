@@ -1,5 +1,11 @@
 # very-cool-table
 
+## 1.3.1
+
+### Patch Changes
+
+- 7c2d2dd: n-rows & n-cols property inheritance: true
+
 ## 1.3.0
 
 ### Minor Changes
