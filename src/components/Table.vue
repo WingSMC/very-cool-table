@@ -331,13 +331,13 @@ provide(KEY_COLUMN, keyColumn);
 @property --vct-n-rows {
 	syntax: '<integer>';
 	initial-value: 0;
-	inherits: false;
+	inherits: true;
 }
 
 @property --vct-n-cols {
 	syntax: '<integer>';
 	initial-value: 0;
-	inherits: false;
+	inherits: true;
 }
 
 :root {
