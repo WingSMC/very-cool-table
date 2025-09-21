@@ -1,5 +1,11 @@
 # very-cool-table
 
+## 1.3.2
+
+### Patch Changes
+
+- 2b7db5d: rename function fix
+
 ## 1.3.1
 
 ### Patch Changes

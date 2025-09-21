@@ -50,6 +50,8 @@ export function useTableOps(
 		if (userInput in table.value) {
 			return _generateUniqueColumnName();
 		}
+
+		return userInput;
 	}
 
 	/**
